@@ -1,0 +1,16 @@
+{
+  "name": "FinZee",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "user": "ubuntu",
+  "install": "./scripts/cloud-agent-install.sh",
+  "terminals": [
+    {
+      "name": "flutter-web",
+      "command": "./scripts/cloud-agent-start-web.sh"
+    }
+  ],
+  "chromeExecutablePath": "/usr/local/bin/google-chrome"
+}
