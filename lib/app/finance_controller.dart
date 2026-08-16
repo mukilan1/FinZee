@@ -16,22 +16,34 @@ class FinanceController extends ChangeNotifier {
     try {
       await app.bootstrap();
     } catch (e) {
-      error = e.toString();
+      error = _friendly(e);
     } finally {
       loading = false;
       notifyListeners();
     }
   }
 
-  Future<void> run(Future<void> Function() action) async {
+  Future<bool> run(Future<void> Function() action) async {
     error = null;
     try {
       await action();
-    } catch (e) {
-      error = e.toString();
-      rethrow;
-    } finally {
       notifyListeners();
+      return true;
+    } catch (e) {
+      error = _friendly(e);
+      notifyListeners();
+      return false;
     }
+  }
+
+  void clearError() {
+    error = null;
+    notifyListeners();
+  }
+
+  String _friendly(Object e) {
+    final text = e.toString();
+    final idx = text.indexOf(': ');
+    return idx == -1 ? text : text.substring(idx + 2);
   }
 }

@@ -579,6 +579,18 @@ class FinanceRepository {
         );
   }
 
+  Future<String?> setting(String key) async {
+    final row = await (db.select(db.appSettings)..where((t) => t.key.equals(key)))
+        .getSingleOrNull();
+    return row?.value;
+  }
+
+  Future<void> setSetting(String key, String value) async {
+    await db.into(db.appSettings).insertOnConflictUpdate(
+          AppSettingsCompanion.insert(key: key, value: value),
+        );
+  }
+
   Future<void> clearAll() async {
     await db.transaction(() async {
       await db.delete(db.transactions).go();

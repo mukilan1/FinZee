@@ -1,5 +1,7 @@
 import 'package:intl/intl.dart';
 
+import 'errors.dart';
+
 /// Integer minor units (paise) — never use floating point for money.
 class Money {
   const Money(this.minor);
@@ -8,6 +10,15 @@ class Money {
 
   factory Money.fromMajor(num major) =>
       Money((major * 100).round());
+
+  factory Money.parse(String raw) {
+    final cleaned = raw.replaceAll(',', '').replaceAll('₹', '').trim();
+    final value = double.tryParse(cleaned);
+    if (value == null || value <= 0) {
+      throw const ValidationError('Enter a valid amount greater than zero.');
+    }
+    return Money.fromMajor(value);
+  }
 
   double get major => minor / 100.0;
 

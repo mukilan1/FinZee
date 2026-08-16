@@ -153,6 +153,10 @@ class MonthlyPlanningService {
     requirePositiveAmount(actual);
     final item = await repo.allocationById(allocationId);
     if (item == null) throw const ValidationError('Allocation not found.');
+    if (item.status == AllocationStatus.completed ||
+        item.status == AllocationStatus.skipped) {
+      throw const ValidationError('This allocation is already closed.');
+    }
     final account = await repo.accountById(accountId);
     requireAccount(account);
 

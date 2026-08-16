@@ -14,8 +14,8 @@ Future<void> showAddSheet(BuildContext context, TransactionType type) async {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (_) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
       child: AddTransactionSheet(initialType: type),
     ),
   );
@@ -37,6 +37,20 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   String? toAccountId;
   String? categoryId;
   String? goalId;
+  bool _ready = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_ready) return;
+    final app = FinanceScope.of(context).app;
+    if (app.accounts.isNotEmpty) {
+      accountId = app.accounts.any((a) => a.id == 'acc_bank')
+          ? 'acc_bank'
+          : app.accounts.first.id;
+    }
+    _ready = true;
+  }
 
   @override
   void dispose() {
@@ -47,8 +61,14 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
-    accountId ??= app.accounts.first.id;
+    final ctrl = FinanceScope.of(context);
+    final app = ctrl.app;
+    if (app.accounts.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Text('Create an account first in More → Accounts.'),
+      );
+    }
     final expenseCats = app.categories.where((c) => c.kind == CategoryKind.expense).toList();
     final incomeCats = app.categories.where((c) => c.kind == CategoryKind.income).toList();
     return Padding(
@@ -75,8 +95,8 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             const SizedBox(height: 12),
             AmountField(controller: amount),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: accountId,
+              DropdownButtonFormField<String>(
+                initialValue: accountId,
               decoration: const InputDecoration(labelText: 'Account'),
               items: app.accounts
                   .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
@@ -119,22 +139,25 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             const SizedBox(height: 12),
             TextField(controller: note, decoration: const InputDecoration(labelText: 'Note')),
             const SizedBox(height: 16),
+            if (ctrl.error != null) ...[
+              Text(ctrl.error!, style: const TextStyle(color: FinzeeColors.expense)),
+              const SizedBox(height: 8),
+            ],
             FilledButton(
               onPressed: () async {
-                final money = Money.fromMajor(double.parse(amount.text));
-                await FinanceScope.of(context).run(
-                  () => app.addTransaction(
+                final ok = await ctrl.run(() async {
+                  await app.addTransaction(
                     type: type,
-                    amount: money,
+                    amount: Money.parse(amount.text),
                     date: DateTime.now(),
                     accountId: accountId!,
                     toAccountId: toAccountId,
                     categoryId: categoryId,
                     note: note.text,
                     goalId: goalId,
-                  ),
-                );
-                if (context.mounted) Navigator.pop(context);
+                  );
+                });
+                if (ok && context.mounted) Navigator.pop(context);
               },
               child: const Text('Save'),
             ),

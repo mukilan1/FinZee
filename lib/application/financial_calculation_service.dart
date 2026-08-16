@@ -220,9 +220,9 @@ class FinancialCalculationService {
           case TransactionType.income:
             if (tx.accountId == account.id) balance += tx.amount;
           case TransactionType.expense:
-          case TransactionType.saving:
           case TransactionType.investment:
             if (tx.accountId == account.id) balance -= tx.amount;
+          case TransactionType.saving:
           case TransactionType.transfer:
             if (tx.accountId == account.id) balance -= tx.amount;
             if (tx.toAccountId == account.id) balance += tx.amount;
@@ -262,8 +262,8 @@ class FinancialCalculationService {
     for (final b in balances) {
       if (b.account.isLiability) {
         liabilities += b.balance;
-      } else if (b.account.type != AccountType.investment) {
-        assets += b.balance;
+      } else if (b.account.type == AccountType.investment) {
+        // Book value lives on Investment records so we do not double-count.
       } else {
         assets += b.balance;
       }

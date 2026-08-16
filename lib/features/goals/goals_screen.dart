@@ -115,9 +115,9 @@ class GoalsScreen extends StatelessWidget {
               SavingsGoal(
                 id: newId(),
                 name: name.text,
-                targetAmount: Money.fromMajor(double.parse(target.text)),
+                targetAmount: Money.parse(target.text),
                 currentAmount: const Money(0),
-                monthlyContribution: monthly.text.isEmpty ? null : Money.fromMajor(double.parse(monthly.text)),
+                monthlyContribution: monthly.text.isEmpty ? null : Money.parse(monthly.text),
               ),
             ),
       );

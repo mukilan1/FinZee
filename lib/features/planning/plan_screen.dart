@@ -58,6 +58,13 @@ class PlanScreen extends StatelessWidget {
             onPressed: app.plan == null ? null : () => ctrl.run(app.confirmThisMonth),
             child: const Text('Confirm plan'),
           ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: app.salary == null
+                ? null
+                : () => ctrl.run(app.recordSalaryIncome),
+            child: const Text('Record salary as income'),
+          ),
           const SizedBox(height: 20),
           if (app.allocations.isEmpty)
             const EmptyState(title: 'No allocations', subtitle: 'Generate a plan or add a monthly template in More.')
@@ -117,15 +124,62 @@ class _AllocationTile extends StatelessWidget {
           Text('${item.plannedAmount.format()} planned'),
           if (item.actualAmount != null) Text('${item.actualAmount!.format()} actual'),
           if (item.skipNote != null) Text(item.skipNote!, style: const TextStyle(color: FinzeeColors.textSecondary)),
-          if (item.status == AllocationStatus.pending) ...[
+          if (item.status == AllocationStatus.pending ||
+              item.status == AllocationStatus.partial) ...[
             const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: FilledButton(
-                    onPressed: () => ctrl.run(
-                      () => app.completeAllocation(item.id, item.plannedAmount, app.accounts.first.id),
-                    ),
+                    onPressed: () async {
+                      if (app.accounts.isEmpty) return;
+                      final amount = TextEditingController(
+                        text: '${item.plannedAmount.major}',
+                      );
+                      var accountId = app.accounts.any((a) => a.id == 'acc_bank')
+                          ? 'acc_bank'
+                          : app.accounts.first.id;
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Complete allocation'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: amount,
+                                decoration: const InputDecoration(
+                                  labelText: 'Actual amount',
+                                  prefixText: '₹ ',
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                initialValue: accountId,
+                                decoration: const InputDecoration(labelText: 'From account'),
+                                items: app.accounts
+                                    .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
+                                    .toList(),
+                                onChanged: (v) => accountId = v ?? accountId,
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await ctrl.run(
+                          () => app.completeAllocation(
+                            item.id,
+                            Money.parse(amount.text),
+                            accountId,
+                          ),
+                        );
+                      }
+                    },
                     child: const Text('Complete'),
                   ),
                 ),

@@ -118,6 +118,53 @@ class CategoriesPage extends StatelessWidget {
     final app = FinanceScope.of(context).app;
     return Scaffold(
       appBar: AppBar(title: const Text('Categories')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final name = TextEditingController();
+          var kind = CategoryKind.expense;
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => StatefulBuilder(
+              builder: (ctx, setSt) => AlertDialog(
+                title: const Text('New category'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+                    DropdownButton<CategoryKind>(
+                      value: kind,
+                      items: CategoryKind.values
+                          .map((k) => DropdownMenuItem(value: k, child: Text(k.name)))
+                          .toList(),
+                      onChanged: (v) => setSt(() => kind = v!),
+                    ),
+                  ],
+                ),
+                actions: [
+                  FilledButton(
+                    onPressed: () async {
+                      if (name.text.trim().isEmpty) return;
+                      await FinanceScope.of(context).run(
+                        () => app.upsertCategory(
+                          Category(
+                            id: newId(),
+                            name: name.text.trim(),
+                            kind: kind,
+                            sortOrder: app.categories.length,
+                          ),
+                        ),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+        child: const Icon(Icons.add),
+      ),
       body: ListView(
         children: app.categories
             .map((c) => ListTile(title: Text(c.name), subtitle: Text(c.kind.name)))
@@ -153,13 +200,20 @@ class SalaryPage extends StatelessWidget {
                       () => app.saveSalary(
                         SalaryProfile(
                           id: app.salary?.id ?? newId(),
-                          baseAmount: Money.fromMajor(double.parse(amount.text)),
+                          baseAmount: Money.parse(amount.text),
                           payDay: int.parse(day.text),
                           effectiveFrom: DateTime.now(),
                         ),
                       ),
                     ),
             child: const Text('Save salary'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: !app.enabled(AppFeature.salaryPlanning) || app.salary == null
+                ? null
+                : () => FinanceScope.of(context).run(app.recordSalaryIncome),
+            child: const Text('Record this month\'s salary as income'),
           ),
           const SizedBox(height: 24),
           const Text('Salary history', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -214,7 +268,7 @@ class BudgetsPage extends StatelessWidget {
                           Budget(
                             id: newId(),
                             categoryId: catId,
-                            amount: Money.fromMajor(double.parse(amount.text)),
+                            amount: Money.parse(amount.text),
                             year: now.year,
                             month: now.month,
                           ),
@@ -262,13 +316,55 @@ class InvestmentsPage extends StatelessWidget {
     final app = FinanceScope.of(context).app;
     return Scaffold(
       appBar: AppBar(title: const Text('Investments')),
+      floatingActionButton: app.enabled(AppFeature.investments)
+          ? FloatingActionButton(
+              onPressed: () async {
+                final name = TextEditingController();
+                final amount = TextEditingController();
+                await showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Add investment'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+                        TextField(controller: amount, decoration: const InputDecoration(labelText: 'Amount', prefixText: '₹ ')),
+                      ],
+                    ),
+                    actions: [
+                      FilledButton(
+                        onPressed: () async {
+                          await FinanceScope.of(context).run(() => app.upsertInvestment(
+                                Investment(
+                                  id: newId(),
+                                  name: name.text,
+                                  type: 'custom',
+                                  amount: Money.parse(amount.text),
+                                  date: DateTime.now(),
+                                  currentValue: Money.parse(amount.text),
+                                ),
+                              ));
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: !app.enabled(AppFeature.investments)
           ? const Center(child: Text('Investments are disabled. Records are kept.'))
-          : ListView(
-              children: app.investments
-                  .map((i) => ListTile(title: Text(i.name), subtitle: Text(i.type), trailing: Text(i.marketValue.format())))
-                  .toList(),
-            ),
+          : app.investments.isEmpty
+              ? const Center(child: Text('No investments yet.'))
+              : ListView(
+                  children: app.investments
+                      .map((i) => ListTile(title: Text(i.name), subtitle: Text(i.type), trailing: Text(i.marketValue.format())))
+                      .toList(),
+                ),
     );
   }
 }
@@ -281,6 +377,47 @@ class BillsPage extends StatelessWidget {
     final app = FinanceScope.of(context).app;
     return Scaffold(
       appBar: AppBar(title: const Text('Bills')),
+      floatingActionButton: app.enabled(AppFeature.bills)
+          ? FloatingActionButton(
+              onPressed: () async {
+                final name = TextEditingController();
+                final amount = TextEditingController();
+                final due = TextEditingController(text: '5');
+                await showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Add bill'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+                        TextField(controller: amount, decoration: const InputDecoration(prefixText: '₹ ')),
+                        TextField(controller: due, decoration: const InputDecoration(labelText: 'Due day')),
+                      ],
+                    ),
+                    actions: [
+                      FilledButton(
+                        onPressed: () async {
+                          await FinanceScope.of(context).run(() => app.upsertBill(
+                                RecurringBill(
+                                  id: newId(),
+                                  name: name.text,
+                                  amount: Money.parse(amount.text),
+                                  dueDay: int.parse(due.text),
+                                  categoryId: 'exp_bills',
+                                ),
+                              ));
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: !app.enabled(AppFeature.bills)
           ? const Center(child: Text('Bills are disabled.'))
           : ListView(children: app.bills.map((b) => ListTile(title: Text(b.name), trailing: Text(b.amount.format()))).toList()),
@@ -296,6 +433,51 @@ class LoansPage extends StatelessWidget {
     final app = FinanceScope.of(context).app;
     return Scaffold(
       appBar: AppBar(title: const Text('Loans')),
+      floatingActionButton: app.enabled(AppFeature.loans)
+          ? FloatingActionButton(
+              onPressed: () async {
+                final name = TextEditingController(text: 'Home loan');
+                final principal = TextEditingController(text: '500000');
+                final emi = TextEditingController(text: '15000');
+                await showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Add loan'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+                        TextField(controller: principal, decoration: const InputDecoration(labelText: 'Principal')),
+                        TextField(controller: emi, decoration: const InputDecoration(labelText: 'EMI')),
+                      ],
+                    ),
+                    actions: [
+                      FilledButton(
+                        onPressed: () async {
+                          final p = Money.parse(principal.text);
+                          await FinanceScope.of(context).run(() => app.upsertLoan(
+                                Loan(
+                                  id: newId(),
+                                  name: name.text,
+                                  principal: p,
+                                  interestRate: 8,
+                                  emi: Money.parse(emi.text),
+                                  startDate: DateTime.now(),
+                                  endDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                                  remaining: p,
+                                ),
+                              ));
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: !app.enabled(AppFeature.loans)
           ? const Center(child: Text('Loans are disabled.'))
           : ListView(children: app.loans.map((l) => ListTile(title: Text(l.name), trailing: Text(l.remaining.format()))).toList()),
@@ -485,12 +667,38 @@ class SecurityPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ctrl = FinanceScope.of(context);
+    final pin = TextEditingController();
     return Scaffold(
       appBar: AppBar(title: const Text('Security')),
-      body: const Padding(
-        padding: EdgeInsets.all(16),
-        child: Text(
-          'App lock uses a locally hashed PIN (never stored in plain text) and optional device biometrics. No account, email, or cloud login exists. Financial data never leaves the device except via your explicit backup file.',
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(ctrl.app.lockEnabled ? 'App lock is ON' : 'App lock is OFF'),
+            const SizedBox(height: 8),
+            const Text(
+              'PIN is hashed and stored only on this device. There is no account or cloud login.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: pin,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'PIN (min 4 digits)'),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => ctrl.run(() => ctrl.app.enablePin(pin.text)),
+              child: const Text('Enable PIN lock'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => ctrl.run(ctrl.app.disablePin),
+              child: const Text('Disable lock'),
+            ),
+          ],
         ),
       ),
     );

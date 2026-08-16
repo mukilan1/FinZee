@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 import '../core/errors.dart';
 import '../core/features.dart';
 import '../core/ids.dart';
@@ -42,6 +46,7 @@ class FinanceApp {
   Future<void> bootstrap() async {
     await repo.seedIfEmpty();
     await reload();
+    if (_lockEnabled) unlocked = false;
   }
 
   Future<void> reload() async {
@@ -63,6 +68,7 @@ class FinanceApp {
     budgets = await repo.budgetsFor(now.year, now.month);
     plan = await repo.planFor(now.year, now.month);
     allocations = plan == null ? [] : await repo.allocationsFor(plan!.id);
+    await _loadLock();
   }
 
   DashboardSnapshot dashboard([DateTime? now]) {
@@ -138,6 +144,27 @@ class FinanceApp {
     if (type == TransactionType.expense && categoryId != null) {
       requireCategory(await repo.categoryById(categoryId));
     }
+    if (type == TransactionType.saving) {
+      toAccountId ??= 'acc_savings';
+      if (toAccountId == accountId) {
+        throw const ValidationError('Savings must move into a different account.');
+      }
+    }
+    String? investmentId;
+    if (type == TransactionType.investment) {
+      investmentId = newId();
+      await repo.upsertInvestment(
+        Investment(
+          id: investmentId,
+          name: note?.isNotEmpty == true ? note! : 'Investment',
+          type: 'custom',
+          amount: amount,
+          date: date,
+          accountId: accountId,
+          currentValue: amount,
+        ),
+      );
+    }
     if (type == TransactionType.saving && goalId != null) {
       final goal = await repo.savingsGoalById(goalId);
       if (goal != null) {
@@ -165,6 +192,7 @@ class FinanceApp {
       categoryId: categoryId,
       note: note,
       goalId: goalId,
+      investmentId: investmentId,
       createdAt: DateTime.now(),
     );
     await repo.insertTransaction(tx);
@@ -173,10 +201,104 @@ class FinanceApp {
   }
 
   Future<void> deleteTransaction(String id) async {
+    final tx = await repo.transactionById(id);
+    if (tx == null) return;
+    if (tx.allocationItemId != null) {
+      throw const ValidationError(
+        'This transaction is tied to a monthly allocation and cannot be deleted.',
+      );
+    }
+    if (tx.type == TransactionType.saving && tx.goalId != null) {
+      final goal = await repo.savingsGoalById(tx.goalId!);
+      if (goal != null) {
+        final next = goal.currentAmount.minor - tx.amount.minor;
+        await repo.upsertSavingsGoal(
+          SavingsGoal(
+            id: goal.id,
+            name: goal.name,
+            targetAmount: goal.targetAmount,
+            currentAmount: Money(next < 0 ? 0 : next),
+            targetDate: goal.targetDate,
+            monthlyContribution: goal.monthlyContribution,
+            priority: goal.priority,
+            notes: goal.notes,
+          ),
+        );
+      }
+    }
     await repo.deleteTransaction(id);
     await repo.audit('TRANSACTION_DELETED', id);
     await reload();
   }
+
+  Future<void> recordSalaryIncome({String? accountId, DateTime? date}) async {
+    if (!enabled(AppFeature.salaryPlanning)) {
+      throw const FeatureUnavailableError('Salary planning is disabled.');
+    }
+    if (salary == null) {
+      throw const ValidationError('Set a salary profile first.');
+    }
+    final when = date ?? DateTime.now();
+    final already = transactions.any(
+      (t) =>
+          t.type == TransactionType.income &&
+          t.categoryId == 'inc_salary' &&
+          t.date.year == when.year &&
+          t.date.month == when.month,
+    );
+    if (already) {
+      throw const ValidationError('Salary for this month is already recorded.');
+    }
+    await addTransaction(
+      type: TransactionType.income,
+      amount: salary!.baseAmount,
+      date: when,
+      accountId: accountId ?? 'acc_bank',
+      categoryId: 'inc_salary',
+      note: 'Salary',
+    );
+  }
+
+  bool get lockEnabled => _lockEnabled;
+  bool unlocked = true;
+  bool _lockEnabled = false;
+
+  Future<void> _loadLock() async {
+    _lockEnabled = (await repo.setting('lock_enabled')) == '1';
+    if (!_lockEnabled) unlocked = true;
+  }
+
+  Future<void> enablePin(String pin) async {
+    if (pin.length < 4) {
+      throw const AuthenticationError('PIN must be at least 4 digits.');
+    }
+    await repo.setSetting('pin_hash', _hash(pin));
+    await repo.setSetting('lock_enabled', '1');
+    _lockEnabled = true;
+    unlocked = true;
+    await repo.audit('FEATURE_ENABLED', 'app_lock');
+    await reload();
+  }
+
+  Future<void> disablePin() async {
+    await repo.setSetting('lock_enabled', '0');
+    _lockEnabled = false;
+    unlocked = true;
+    await reload();
+  }
+
+  Future<void> unlockWithPin(String pin) async {
+    final stored = await repo.setting('pin_hash');
+    if (stored == null) {
+      throw const AuthenticationError('No PIN configured.');
+    }
+    if (stored != _hash(pin)) {
+      throw const AuthenticationError('Incorrect PIN.');
+    }
+    unlocked = true;
+  }
+
+  String _hash(String pin) => sha256.convert(utf8.encode(pin)).toString();
 
   Future<void> upsertAccount(Account account) async {
     requireValidCurrency(account.currency);

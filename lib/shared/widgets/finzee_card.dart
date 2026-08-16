@@ -11,14 +11,17 @@ class FinzeeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: padding ?? const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color ?? FinzeeColors.surface,
+    return Material(
+      color: color ?? FinzeeColors.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: FinzeeColors.border.withValues(alpha: 0.6)),
+        side: BorderSide(color: FinzeeColors.border.withValues(alpha: 0.6)),
       ),
-      child: child,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(16),
+        child: child,
+      ),
     );
   }
 }
