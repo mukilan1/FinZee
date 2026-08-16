@@ -10,8 +10,10 @@ import 'database/finance_repository.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  final db = await AppDatabase.open();
-  final controller = FinanceController(FinanceApp(FinanceRepository(db)));
+  final db = AppDatabase.open();
+  final controller = FinanceController(
+    FinanceApp(FinanceRepository(db), loadDemoIfEmpty: true),
+  );
   await controller.start();
   runApp(FinzeeApp(controller: controller));
 }

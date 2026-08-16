@@ -193,10 +193,7 @@ class FinancialCalculationService {
       allocationTotal: allocations.length,
       allocatedActual: allocatedActual,
       allocatedPlanned: allocatedPlanned,
-      alerts: [
-        ...extraAlerts,
-        ...budgetAlerts(budgets, monthTx),
-      ],
+      alerts: extraAlerts,
       netWorth: nw.$1,
       assets: nw.$2,
       liabilities: nw.$3,

@@ -20,12 +20,9 @@ class HomeScreen extends StatelessWidget {
     }
     final dash = ctrl.app.dashboard();
     final cats = {for (final c in ctrl.app.categories) c.id: c.name};
-    return SafeArea(
-      child: ListView(
+    return ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         children: [
-          const Text('FinZee', style: TextStyle(color: FinzeeColors.textSecondary)),
-          const SizedBox(height: 4),
           Text('How am I doing this month?', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 16),
           Container(
@@ -149,9 +146,9 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ],
-          if (dash.alerts.isNotEmpty) ...[
+          if (dash.alerts.any((a) => !a.read)) ...[
             const SizedBox(height: 16),
-            ...dash.alerts.map(
+            ...dash.alerts.where((a) => !a.read).take(3).map(
               (a) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: FinzeeCard(
@@ -180,7 +177,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
         ],
-      ),
     );
   }
 }

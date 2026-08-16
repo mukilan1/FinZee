@@ -9,12 +9,14 @@ import '../core/money.dart';
 import '../core/validators.dart';
 import '../database/finance_repository.dart';
 import '../domain/entities.dart';
+import 'alert_service.dart';
 import 'backup_service.dart';
+import 'demo_data.dart';
 import 'financial_calculation_service.dart';
 import 'monthly_planning_service.dart';
 
 class FinanceApp {
-  FinanceApp(this.repo)
+  FinanceApp(this.repo, {this.loadDemoIfEmpty = false})
       : planning = MonthlyPlanningService(repo),
         backup = BackupService(repo);
 
@@ -22,6 +24,10 @@ class FinanceApp {
   final MonthlyPlanningService planning;
   final BackupService backup;
   final calc = FinancialCalculationService();
+  final alertsEngine = AlertService();
+  final bool loadDemoIfEmpty;
+  Set<String> readAlertIds = {};
+  Set<String> dismissedAlertIds = {};
 
   Map<AppFeature, bool> features = Map.from(defaultFeatureStates);
   List<Account> accounts = [];
@@ -46,8 +52,14 @@ class FinanceApp {
   Future<void> bootstrap() async {
     await repo.seedIfEmpty();
     await reload();
+    if (loadDemoIfEmpty && transactions.isEmpty) {
+      await DemoDataLoader(this).load();
+    }
     if (_lockEnabled) unlocked = false;
   }
+
+  Future<void> loadSampleData({bool reset = false}) =>
+      DemoDataLoader(this).load(reset: reset);
 
   Future<void> reload() async {
     features = await repo.loadFeatures();
@@ -69,6 +81,7 @@ class FinanceApp {
     plan = await repo.planFor(now.year, now.month);
     allocations = plan == null ? [] : await repo.allocationsFor(plan!.id);
     await _loadLock();
+    await _loadAlertState();
   }
 
   DashboardSnapshot dashboard([DateTime? now]) {
@@ -82,38 +95,74 @@ class FinanceApp {
       investments: enabled(AppFeature.investments) ? investments : const [],
       loans: enabled(AppFeature.loans) ? loans : const [],
       budgets: enabled(AppFeature.budgets) ? budgets : const [],
-      extraAlerts: localAlerts(d),
+      extraAlerts: allAlerts(d),
     );
   }
 
-  List<LocalAlert> localAlerts(DateTime now) {
-    final alerts = <LocalAlert>[];
-    if (enabled(AppFeature.salaryPlanning) && salary != null && salary!.payDay == now.day) {
-      alerts.add(
-        const LocalAlert(
-          id: 'salary_today',
-          title: 'Salary expected today',
-          body: 'Your salary is expected today.',
-          kind: 'salary',
-        ),
-      );
-    }
-    if (enabled(AppFeature.salaryPlanning)) {
-      final pending =
-          allocations.where((a) => a.status == AllocationStatus.pending).length;
-      if (pending > 0) {
-        alerts.add(
-          LocalAlert(
-            id: 'alloc_pending',
-            title: 'Allocations pending',
-            body: 'You have $pending monthly allocations pending.',
-            kind: 'allocation',
-          ),
-        );
-      }
-    }
-    return alerts;
+  List<LocalAlert> allAlerts([DateTime? now]) {
+    final d = now ?? DateTime.now();
+    return alertsEngine
+        .build(
+          now: d,
+          features: features,
+          accounts: accounts,
+          transactions: transactions,
+          allocations: enabled(AppFeature.salaryPlanning) ? allocations : const [],
+          plan: enabled(AppFeature.salaryPlanning) ? plan : null,
+          salary: enabled(AppFeature.salaryPlanning) ? salary : null,
+          budgets: enabled(AppFeature.budgets) ? budgets : const [],
+          bills: enabled(AppFeature.bills) ? bills : const [],
+          loans: enabled(AppFeature.loans) ? loans : const [],
+          savingsGoals: enabled(AppFeature.savingsGoals) ? savingsGoals : const [],
+          investments: enabled(AppFeature.investments) ? investments : const [],
+          financialGoals:
+              enabled(AppFeature.financialGoals) ? financialGoals : const [],
+        )
+        .where((a) => !dismissedAlertIds.contains(a.id))
+        .map((a) => a.copyWith(read: readAlertIds.contains(a.id)))
+        .toList();
   }
+
+  int unreadAlertCount([DateTime? now]) =>
+      allAlerts(now).where((a) => !a.read).length;
+
+  Future<void> markAlertsRead(Iterable<String> ids) async {
+    readAlertIds = {...readAlertIds, ...ids};
+    await repo.setSetting('alert_read_ids', jsonEncode(readAlertIds.toList()));
+  }
+
+  Future<void> dismissAlert(String id) async {
+    dismissedAlertIds = {...dismissedAlertIds, id};
+    readAlertIds = {...readAlertIds, id};
+    await repo.setSetting(
+      'alert_dismissed_ids',
+      jsonEncode(dismissedAlertIds.toList()),
+    );
+    await repo.setSetting('alert_read_ids', jsonEncode(readAlertIds.toList()));
+    await repo.audit('ALERT_DISMISSED', id);
+  }
+
+  Future<void> markInboxRead() async {
+    await markAlertsRead(allAlerts().map((a) => a.id));
+  }
+
+  Future<void> _loadAlertState() async {
+    readAlertIds = _decodeIdSet(await repo.setting('alert_read_ids'));
+    dismissedAlertIds = _decodeIdSet(await repo.setting('alert_dismissed_ids'));
+  }
+
+  Set<String> _decodeIdSet(String? raw) {
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return {};
+      return decoded.whereType<String>().toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  List<LocalAlert> localAlerts(DateTime now) => allAlerts(now);
 
   Future<void> setFeature(AppFeature feature, bool on) async {
     await repo.setFeature(feature, on);
@@ -433,5 +482,247 @@ class FinanceApp {
       transactions: transactions,
       netWorth: snap.netWorth,
     );
+  }
+
+  Future<void> updateTransaction(FinanceTransaction next) async {
+    final prev = await repo.transactionById(next.id);
+    if (prev == null) return;
+    requirePositiveAmount(next.amount);
+    requireValidDate(next.date);
+    if (prev.allocationItemId != null) {
+      if (prev.amount != next.amount ||
+          prev.type != next.type ||
+          prev.accountId != next.accountId ||
+          prev.toAccountId != next.toAccountId) {
+        throw const ValidationError(
+          'Allocation-linked transactions can only change date or note.',
+        );
+      }
+    }
+    if (prev.type == TransactionType.saving && prev.goalId != null) {
+      final oldGoal = await repo.savingsGoalById(prev.goalId!);
+      if (oldGoal != null) {
+        final revertedMinor = oldGoal.currentAmount.minor - prev.amount.minor;
+        await repo.upsertSavingsGoal(
+          SavingsGoal(
+            id: oldGoal.id,
+            name: oldGoal.name,
+            targetAmount: oldGoal.targetAmount,
+            currentAmount: Money(revertedMinor < 0 ? 0 : revertedMinor),
+            targetDate: oldGoal.targetDate,
+            monthlyContribution: oldGoal.monthlyContribution,
+            priority: oldGoal.priority,
+            notes: oldGoal.notes,
+          ),
+        );
+      }
+    }
+    if (next.type == TransactionType.saving && next.goalId != null) {
+      final goal = await repo.savingsGoalById(next.goalId!);
+      if (goal != null) {
+        await repo.upsertSavingsGoal(
+          SavingsGoal(
+            id: goal.id,
+            name: goal.name,
+            targetAmount: goal.targetAmount,
+            currentAmount: goal.currentAmount + next.amount,
+            targetDate: goal.targetDate,
+            monthlyContribution: goal.monthlyContribution,
+            priority: goal.priority,
+            notes: goal.notes,
+          ),
+        );
+      }
+    }
+    await repo.upsertTransaction(next);
+    await repo.audit('TRANSACTION_UPDATED', next.id);
+    await reload();
+  }
+
+  Future<void> deleteAccount(String id) async {
+    final used = transactions.any((t) => t.accountId == id || t.toAccountId == id);
+    if (used) {
+      throw const ValidationError(
+        'This account has transactions. Archive it or move the history first.',
+      );
+    }
+    if (accounts.where((a) => !a.archived).length <= 1) {
+      throw const ValidationError('Keep at least one account.');
+    }
+    await repo.deleteAccount(id);
+    await repo.audit('ACCOUNT_DELETED', id);
+    await reload();
+  }
+
+  Future<void> archiveAccount(String id) async {
+    final matches = accounts.where((a) => a.id == id);
+    if (matches.isEmpty) return;
+    final account = matches.first;
+    await repo.upsertAccount(
+      Account(
+        id: account.id,
+        name: account.name,
+        type: account.type,
+        openingBalance: account.openingBalance,
+        currency: account.currency,
+        notes: account.notes,
+        archived: true,
+        createdAt: account.createdAt,
+      ),
+    );
+    await repo.audit('ACCOUNT_ARCHIVED', id);
+    await reload();
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final used = transactions.any((t) => t.categoryId == id);
+    if (used) {
+      throw const ValidationError(
+        'This category is used by transactions and cannot be deleted.',
+      );
+    }
+    await repo.deleteCategory(id);
+    await repo.audit('CATEGORY_DELETED', id);
+    await reload();
+  }
+
+  Future<void> updatePlan({required Money expectedIncome, DateTime? createdAt}) async {
+    if (plan == null) throw const ValidationError('No plan to edit.');
+    await repo.upsertPlan(
+      MonthlyPlan(
+        id: plan!.id,
+        year: plan!.year,
+        month: plan!.month,
+        expectedIncome: expectedIncome,
+        confirmed: plan!.confirmed,
+        createdAt: createdAt ?? plan!.createdAt,
+      ),
+    );
+    await repo.audit('PLAN_UPDATED', plan!.id);
+    await reload();
+  }
+
+  Future<void> addAllocation({
+    required String name,
+    required AllocationKind kind,
+    required Money plannedAmount,
+    String? categoryId,
+    String? goalId,
+    String? investmentId,
+  }) async {
+    if (plan == null) throw const ValidationError('Generate a plan first.');
+    requirePositiveAmount(plannedAmount);
+    await repo.upsertAllocation(
+      AllocationItem(
+        id: newId(),
+        planId: plan!.id,
+        name: name,
+        kind: kind,
+        plannedAmount: plannedAmount,
+        categoryId: categoryId,
+        goalId: goalId,
+        investmentId: investmentId,
+        sortOrder: allocations.length,
+      ),
+    );
+    await repo.audit('ALLOCATION_CREATED', name);
+    await reload();
+  }
+
+  Future<void> updateAllocation(AllocationItem item) async {
+    final existing = await repo.allocationById(item.id);
+    if (existing == null) throw const ValidationError('Allocation not found.');
+    if (existing.status == AllocationStatus.completed ||
+        existing.status == AllocationStatus.skipped) {
+      throw const ValidationError('Closed allocations cannot be edited.');
+    }
+    requirePositiveAmount(item.plannedAmount);
+    await repo.upsertAllocation(item);
+    await repo.audit('ALLOCATION_UPDATED', item.id);
+    await reload();
+  }
+
+  Future<void> deleteAllocation(String id) async {
+    final item = await repo.allocationById(id);
+    if (item == null) return;
+    if (item.status != AllocationStatus.pending) {
+      throw const ValidationError(
+        'Only pending allocations can be deleted. Closed items stay in history.',
+      );
+    }
+    if (transactions.any((t) => t.allocationItemId == id)) {
+      throw const ValidationError('This allocation already has a transaction.');
+    }
+    await repo.deleteAllocation(id);
+    await repo.audit('ALLOCATION_DELETED', id);
+    await reload();
+  }
+
+  Future<void> deleteSavingsGoal(String id) async {
+    await repo.deleteSavingsGoal(id);
+    await repo.audit('GOAL_DELETED', id);
+    await reload();
+  }
+
+  Future<void> deleteInvestment(String id) async {
+    await repo.deleteInvestment(id);
+    await repo.audit('INVESTMENT_DELETED', id);
+    await reload();
+  }
+
+  Future<void> deleteBudget(String id) async {
+    await repo.deleteBudget(id);
+    await repo.audit('BUDGET_DELETED', id);
+    await reload();
+  }
+
+  Future<void> deleteBill(String id) async {
+    await repo.deleteBill(id);
+    await repo.audit('BILL_DELETED', id);
+    await reload();
+  }
+
+  Future<void> deleteLoan(String id) async {
+    await repo.deleteLoan(id);
+    await repo.audit('LOAN_DELETED', id);
+    await reload();
+  }
+
+  Future<void> deleteFinancialGoal(String id) async {
+    await repo.deleteFinancialGoal(id);
+    await repo.audit('FINANCIAL_GOAL_DELETED', id);
+    await reload();
+  }
+
+  Future<void> updateNote(FinanceNote note) async {
+    await repo.upsertNote(note);
+    await reload();
+  }
+
+  Future<void> deleteNote(String id) async {
+    await repo.deleteNote(id);
+    await repo.audit('NOTE_DELETED', id);
+    await reload();
+  }
+
+  Future<void> wipeAllData({
+    required String typedPhrase,
+    String? pin,
+  }) async {
+    if (typedPhrase.trim() != 'DELETE') {
+      throw const ValidationError('Type DELETE to confirm wiping this app.');
+    }
+    if (_lockEnabled) {
+      final stored = await repo.setting('pin_hash');
+      if (stored == null || stored != _hash(pin ?? '')) {
+        throw const AuthenticationError('PIN is required to delete all data.');
+      }
+    }
+    await repo.clearAll();
+    await repo.seedDefaults();
+    readAlertIds = {};
+    dismissedAlertIds = {};
+    await repo.audit('APP_WIPED');
+    await reload();
   }
 }

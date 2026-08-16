@@ -1,29 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'finance_controller.dart';
 import 'finance_scope.dart';
 import 'router.dart';
 import 'theme.dart';
 
-class FinzeeApp extends StatelessWidget {
+class FinzeeApp extends StatefulWidget {
   const FinzeeApp({super.key, required this.controller});
 
   final FinanceController controller;
 
   @override
+  State<FinzeeApp> createState() => _FinzeeAppState();
+}
+
+class _FinzeeAppState extends State<FinzeeApp> {
+  late final GoRouter _router = createAppRouter();
+
+  @override
   Widget build(BuildContext context) {
     return FinanceScope(
-      controller: controller,
+      controller: widget.controller,
       child: ListenableBuilder(
-        listenable: controller,
+        listenable: widget.controller,
         builder: (context, _) {
           return MaterialApp.router(
             title: 'FinZee',
             debugShowCheckedModeBanner: false,
             theme: buildFinzeeTheme(),
-            routerConfig: appRouter,
+            routerConfig: _router,
             builder: (context, child) {
-              final locked = controller.app.lockEnabled && !controller.app.unlocked;
+              final locked = widget.controller.app.lockEnabled && !widget.controller.app.unlocked;
               return Stack(
                 children: [
                   child ?? const SizedBox.shrink(),

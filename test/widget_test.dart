@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:finzee/app/app.dart';
 import 'package:finzee/app/finance_controller.dart';
 import 'package:finzee/application/finance_app.dart';
@@ -20,7 +21,7 @@ void main() {
   }
 
   setUp(() async {
-    db = AppDatabase.memory();
+    db = AppDatabase(NativeDatabase.memory());
     controller = FinanceController(FinanceApp(FinanceRepository(db)));
     await controller.start();
   });
@@ -48,6 +49,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Backup & restore'), findsOneWidget);
     expect(find.text('Features'), findsOneWidget);
+    expect(find.byTooltip('Notifications'), findsOneWidget);
+  });
+
+  testWidgets('accounts page shows add account actions', (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('More')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Accounts'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add account'), findsWidgets);
+    expect(find.byTooltip('Add account'), findsWidgets);
   });
 
   testWidgets('adding an expense from the sheet updates home', (tester) async {

@@ -10,7 +10,9 @@ import '../../core/ids.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
+import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
+import '../manage/crud_pages.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -32,9 +34,11 @@ class MoreScreen extends StatelessWidget {
           _tile(context, Icons.account_balance_outlined, 'Loans', const LoansPage()),
           _tile(context, Icons.insights_outlined, 'Reports', const ReportsPage()),
           _tile(context, Icons.notes_outlined, 'Notes', const NotesPage()),
+          _tile(context, Icons.science_outlined, 'Sample data', const SampleDataPage()),
           _tile(context, Icons.toggle_on_outlined, 'Features', const FeaturesPage()),
           _tile(context, Icons.backup_outlined, 'Backup & restore', const BackupPage()),
           _tile(context, Icons.lock_outline, 'Security', const SecurityPage()),
+          _tile(context, Icons.delete_forever_outlined, 'Delete all data', const DangerZonePage()),
           _tile(context, Icons.info_outline, 'About', const AboutPage()),
         ],
       ),
@@ -48,140 +52,43 @@ class MoreScreen extends StatelessWidget {
         leading: Icon(icon, color: FinzeeColors.primaryDark),
         title: Text(title),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => page)),
+        onTap: () => Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(builder: (_) => page),
+        ),
       ),
     );
   }
 }
 
-class AccountsPage extends StatelessWidget {
-  const AccountsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
-    final balances = app.calc.accountBalances(app.accounts, app.transactions);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Accounts')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final name = TextEditingController();
-          await showDialog<void>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('New account'),
-              content: TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                FilledButton(
-                  onPressed: () async {
-                    await FinanceScope.of(context).run(() => app.upsertAccount(
-                          Account(
-                            id: newId(),
-                            name: name.text,
-                            type: AccountType.bank,
-                            openingBalance: const Money(0),
-                            createdAt: DateTime.now(),
-                          ),
-                        ));
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: balances
-            .map((b) => FinzeeCard(
-                  child: ListTile(
-                    title: Text(b.account.name),
-                    subtitle: Text(b.account.type.name),
-                    trailing: Text(b.balance.format(), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                ))
-            .toList(),
-      ),
-    );
-  }
-}
-
-class CategoriesPage extends StatelessWidget {
-  const CategoriesPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Categories')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final name = TextEditingController();
-          var kind = CategoryKind.expense;
-          await showDialog<void>(
-            context: context,
-            builder: (ctx) => StatefulBuilder(
-              builder: (ctx, setSt) => AlertDialog(
-                title: const Text('New category'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
-                    DropdownButton<CategoryKind>(
-                      value: kind,
-                      items: CategoryKind.values
-                          .map((k) => DropdownMenuItem(value: k, child: Text(k.name)))
-                          .toList(),
-                      onChanged: (v) => setSt(() => kind = v!),
-                    ),
-                  ],
-                ),
-                actions: [
-                  FilledButton(
-                    onPressed: () async {
-                      if (name.text.trim().isEmpty) return;
-                      await FinanceScope.of(context).run(
-                        () => app.upsertCategory(
-                          Category(
-                            id: newId(),
-                            name: name.text.trim(),
-                            kind: kind,
-                            sortOrder: app.categories.length,
-                          ),
-                        ),
-                      );
-                      if (ctx.mounted) Navigator.pop(ctx);
-                    },
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: ListView(
-        children: app.categories
-            .map((c) => ListTile(title: Text(c.name), subtitle: Text(c.kind.name)))
-            .toList(),
-      ),
-    );
-  }
-}
-
-class SalaryPage extends StatelessWidget {
+class SalaryPage extends StatefulWidget {
   const SalaryPage({super.key});
+  @override
+  State<SalaryPage> createState() => _SalaryPageState();
+}
+
+class _SalaryPageState extends State<SalaryPage> {
+  late final amount = TextEditingController();
+  late final day = TextEditingController();
+  late final source = TextEditingController();
+  DateTime effective = DateTime.now();
+
+  bool _seeded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_seeded) return;
+    final salary = FinanceScope.of(context).app.salary;
+    amount.text = salary == null ? '' : '${salary.baseAmount.major}';
+    day.text = '${salary?.payDay ?? 1}';
+    source.text = salary?.source ?? 'Employer';
+    effective = salary?.effectiveFrom ?? DateTime.now();
+    _seeded = true;
+  }
 
   @override
   Widget build(BuildContext context) {
     final app = FinanceScope.of(context).app;
-    final amount = TextEditingController(text: app.salary == null ? '' : '${app.salary!.baseAmount.major}');
-    final day = TextEditingController(text: '${app.salary?.payDay ?? 1}');
     return Scaffold(
       appBar: AppBar(title: const Text('Salary & income')),
       body: ListView(
@@ -192,6 +99,16 @@ class SalaryPage extends StatelessWidget {
           AmountField(controller: amount, label: 'Base salary'),
           const SizedBox(height: 12),
           TextField(controller: day, decoration: const InputDecoration(labelText: 'Pay day (1-31)')),
+          const SizedBox(height: 12),
+          TextField(controller: source, decoration: const InputDecoration(labelText: 'Source')),
+          TimelineTile(
+            label: 'Effective from',
+            date: effective,
+            onPick: () async {
+              final d = await pickTimeline(context, initial: effective);
+              if (d != null) setState(() => effective = d);
+            },
+          ),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: !app.enabled(AppFeature.salaryPlanning)
@@ -202,7 +119,8 @@ class SalaryPage extends StatelessWidget {
                           id: app.salary?.id ?? newId(),
                           baseAmount: Money.parse(amount.text),
                           payDay: int.parse(day.text),
-                          effectiveFrom: DateTime.now(),
+                          source: source.text,
+                          effectiveFrom: effective,
                         ),
                       ),
                     ),
@@ -229,292 +147,50 @@ class SalaryPage extends StatelessWidget {
   }
 }
 
-class BudgetsPage extends StatelessWidget {
-  const BudgetsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
-    final now = DateTime.now();
-    final usage = app.calc.budgetUsage(app.budgets, app.transactions.where((t) => t.date.year == now.year && t.date.month == now.month).toList());
-    return Scaffold(
-      appBar: AppBar(title: const Text('Budgets')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final cats = app.categories.where((c) => c.kind == CategoryKind.expense).toList();
-          if (cats.isEmpty) return;
-          String catId = cats.first.id;
-          final amount = TextEditingController(text: '8000');
-          await showDialog<void>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Budget'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButton<String>(
-                    value: catId,
-                    isExpanded: true,
-                    items: cats.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
-                    onChanged: (v) => catId = v!,
-                  ),
-                  TextField(controller: amount, decoration: const InputDecoration(prefixText: '₹ ')),
-                ],
-              ),
-              actions: [
-                FilledButton(
-                  onPressed: () async {
-                    await FinanceScope.of(context).run(() => app.upsertBudget(
-                          Budget(
-                            id: newId(),
-                            categoryId: catId,
-                            amount: Money.parse(amount.text),
-                            year: now.year,
-                            month: now.month,
-                          ),
-                        ));
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
-      body: usage.isEmpty
-          ? const Center(child: Text('No budgets this month.'))
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: usage
-                  .map((u) {
-                    final name = app.categories.where((c) => c.id == u.budget.categoryId).firstOrNull?.name ?? 'Category';
-                    return FinzeeCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          Text('${u.spent.format()} / ${u.budget.amount.format()}'),
-                          LinearProgressIndicator(value: u.ratio.clamp(0, 1), color: u.warningLevel >= 90 ? FinzeeColors.expense : FinzeeColors.primary),
-                          Text('Remaining ${u.remaining.format()}', style: const TextStyle(color: FinzeeColors.textSecondary)),
-                        ],
-                      ),
-                    );
-                  })
-                  .toList(),
-            ),
-    );
-  }
-}
-
-class InvestmentsPage extends StatelessWidget {
-  const InvestmentsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Investments')),
-      floatingActionButton: app.enabled(AppFeature.investments)
-          ? FloatingActionButton(
-              onPressed: () async {
-                final name = TextEditingController();
-                final amount = TextEditingController();
-                await showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Add investment'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
-                        TextField(controller: amount, decoration: const InputDecoration(labelText: 'Amount', prefixText: '₹ ')),
-                      ],
-                    ),
-                    actions: [
-                      FilledButton(
-                        onPressed: () async {
-                          await FinanceScope.of(context).run(() => app.upsertInvestment(
-                                Investment(
-                                  id: newId(),
-                                  name: name.text,
-                                  type: 'custom',
-                                  amount: Money.parse(amount.text),
-                                  date: DateTime.now(),
-                                  currentValue: Money.parse(amount.text),
-                                ),
-                              ));
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        },
-                        child: const Text('Save'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              child: const Icon(Icons.add),
-            )
-          : null,
-      body: !app.enabled(AppFeature.investments)
-          ? const Center(child: Text('Investments are disabled. Records are kept.'))
-          : app.investments.isEmpty
-              ? const Center(child: Text('No investments yet.'))
-              : ListView(
-                  children: app.investments
-                      .map((i) => ListTile(title: Text(i.name), subtitle: Text(i.type), trailing: Text(i.marketValue.format())))
-                      .toList(),
-                ),
-    );
-  }
-}
-
-class BillsPage extends StatelessWidget {
-  const BillsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Bills')),
-      floatingActionButton: app.enabled(AppFeature.bills)
-          ? FloatingActionButton(
-              onPressed: () async {
-                final name = TextEditingController();
-                final amount = TextEditingController();
-                final due = TextEditingController(text: '5');
-                await showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Add bill'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
-                        TextField(controller: amount, decoration: const InputDecoration(prefixText: '₹ ')),
-                        TextField(controller: due, decoration: const InputDecoration(labelText: 'Due day')),
-                      ],
-                    ),
-                    actions: [
-                      FilledButton(
-                        onPressed: () async {
-                          await FinanceScope.of(context).run(() => app.upsertBill(
-                                RecurringBill(
-                                  id: newId(),
-                                  name: name.text,
-                                  amount: Money.parse(amount.text),
-                                  dueDay: int.parse(due.text),
-                                  categoryId: 'exp_bills',
-                                ),
-                              ));
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        },
-                        child: const Text('Save'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              child: const Icon(Icons.add),
-            )
-          : null,
-      body: !app.enabled(AppFeature.bills)
-          ? const Center(child: Text('Bills are disabled.'))
-          : ListView(children: app.bills.map((b) => ListTile(title: Text(b.name), trailing: Text(b.amount.format()))).toList()),
-    );
-  }
-}
-
-class LoansPage extends StatelessWidget {
-  const LoansPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Loans')),
-      floatingActionButton: app.enabled(AppFeature.loans)
-          ? FloatingActionButton(
-              onPressed: () async {
-                final name = TextEditingController(text: 'Home loan');
-                final principal = TextEditingController(text: '500000');
-                final emi = TextEditingController(text: '15000');
-                await showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Add loan'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
-                        TextField(controller: principal, decoration: const InputDecoration(labelText: 'Principal')),
-                        TextField(controller: emi, decoration: const InputDecoration(labelText: 'EMI')),
-                      ],
-                    ),
-                    actions: [
-                      FilledButton(
-                        onPressed: () async {
-                          final p = Money.parse(principal.text);
-                          await FinanceScope.of(context).run(() => app.upsertLoan(
-                                Loan(
-                                  id: newId(),
-                                  name: name.text,
-                                  principal: p,
-                                  interestRate: 8,
-                                  emi: Money.parse(emi.text),
-                                  startDate: DateTime.now(),
-                                  endDate: DateTime.now().add(const Duration(days: 365 * 5)),
-                                  remaining: p,
-                                ),
-                              ));
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        },
-                        child: const Text('Save'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              child: const Icon(Icons.add),
-            )
-          : null,
-      body: !app.enabled(AppFeature.loans)
-          ? const Center(child: Text('Loans are disabled.'))
-          : ListView(children: app.loans.map((l) => ListTile(title: Text(l.name), trailing: Text(l.remaining.format()))).toList()),
-    );
-  }
-}
-
-class ReportsPage extends StatelessWidget {
+class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
+  @override
+  State<ReportsPage> createState() => _ReportsPageState();
+}
+
+class _ReportsPageState extends State<ReportsPage> {
+  late DateTime month = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
     final app = FinanceScope.of(context).app;
-    final month = app.monthlyReport();
-    final year = app.yearlyReport();
+    final report = app.monthlyReport(month);
+    final year = app.yearlyReport(month);
     return Scaffold(
       appBar: AppBar(title: const Text('Reports')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          TimelineTile(
+            label: 'Report month',
+            date: DateTime(month.year, month.month, 1),
+            onPick: () async {
+              final d = await pickTimeline(context, initial: month);
+              if (d != null) setState(() => month = d);
+            },
+          ),
           FinzeeCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Monthly ${month.range.year}-${month.range.month}'),
-                Text('Income ${month.income.format()}'),
-                Text('Expenses ${month.expenses.format()}'),
-                Text('Savings ${month.savings.format()}'),
-                Text('Investments ${month.investments.format()}'),
-                Text('Remaining ${month.remaining.format()}'),
-                Text('Allocation success ${(month.allocationSuccessRate * 100).round()}%'),
+                Text('Monthly ${report.range.year}-${report.range.month}'),
+                Text('Income ${report.income.format()}'),
+                Text('Expenses ${report.expenses.format()}'),
+                Text('Savings ${report.savings.format()}'),
+                Text('Investments ${report.investments.format()}'),
+                Text('Remaining ${report.remaining.format()}'),
+                Text('Allocation success ${(report.allocationSuccessRate * 100).round()}%'),
               ],
             ),
           ),
           const SizedBox(height: 12),
           const Text('Planned vs actual', style: TextStyle(fontWeight: FontWeight.w600)),
-          ...month.plannedVsActual.map(
+          ...report.plannedVsActual.map(
             (r) => ListTile(
               title: Text(r.name),
               subtitle: Text('${r.planned.format()} → ${r.actual.format()}'),
@@ -540,37 +216,49 @@ class ReportsPage extends StatelessWidget {
   }
 }
 
-class NotesPage extends StatelessWidget {
-  const NotesPage({super.key});
+class SampleDataPage extends StatelessWidget {
+  const SampleDataPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
+    final ctrl = FinanceScope.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Notes')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final body = TextEditingController();
-          await showDialog<void>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Note'),
-              content: TextField(controller: body, maxLines: 4),
-              actions: [
-                FilledButton(
-                  onPressed: () async {
-                    await FinanceScope.of(context).run(() => app.addNote(body.text));
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
+      appBar: AppBar(title: const Text('Sample data')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Loads a full household example: salary history, 3 months of transactions, '
+              'monthly plan with completed / partial / skipped allocations, goals, '
+              'investments, bills, loan EMI, budgets, and notes.',
             ),
-          );
-        },
-        child: const Icon(Icons.add),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Replace current data?'),
+                    content: const Text(
+                      'This clears the local database and loads the sample household. Export a backup first if you have real data.',
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Load sample')),
+                    ],
+                  ),
+                );
+                if (ok == true && context.mounted) {
+                  await ctrl.run(() => ctrl.app.loadSampleData(reset: true));
+                }
+              },
+              child: const Text('Load sample household'),
+            ),
+          ],
+        ),
       ),
-      body: ListView(children: app.notes.map((n) => ListTile(title: Text(n.body), subtitle: Text(n.createdAt.toString()))).toList()),
     );
   }
 }
@@ -720,8 +408,4 @@ class AboutPage extends StatelessWidget {
       ),
     );
   }
-}
-
-extension _FirstOrNull<E> on Iterable<E> {
-  E? get firstOrNull => isEmpty ? null : first;
 }

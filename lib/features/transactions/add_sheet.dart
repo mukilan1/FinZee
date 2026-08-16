@@ -4,6 +4,7 @@ import '../../app/finance_scope.dart';
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
+import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 
 Future<void> showAddSheet(BuildContext context, TransactionType type) async {
@@ -37,6 +38,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   String? toAccountId;
   String? categoryId;
   String? goalId;
+  DateTime date = DateTime.now();
   bool _ready = false;
 
   @override
@@ -137,6 +139,15 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               ),
             ],
             const SizedBox(height: 12),
+            TimelineTile(
+              label: 'Date',
+              date: date,
+              onPick: () async {
+                final picked = await pickTimeline(context, initial: date);
+                if (picked != null) setState(() => date = picked);
+              },
+            ),
+            const SizedBox(height: 12),
             TextField(controller: note, decoration: const InputDecoration(labelText: 'Note')),
             const SizedBox(height: 16),
             if (ctrl.error != null) ...[
@@ -149,7 +160,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                   await app.addTransaction(
                     type: type,
                     amount: Money.parse(amount.text),
-                    date: DateTime.now(),
+                    date: date,
                     accountId: accountId!,
                     toAccountId: toAccountId,
                     categoryId: categoryId,
@@ -160,6 +171,114 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                 if (ok && context.mounted) Navigator.pop(context);
               },
               child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> showEditTransaction(BuildContext context, FinanceTransaction tx) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: FinzeeColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      child: _EditTransactionSheet(tx: tx),
+    ),
+  );
+}
+
+class _EditTransactionSheet extends StatefulWidget {
+  const _EditTransactionSheet({required this.tx});
+  final FinanceTransaction tx;
+
+  @override
+  State<_EditTransactionSheet> createState() => _EditTransactionSheetState();
+}
+
+class _EditTransactionSheetState extends State<_EditTransactionSheet> {
+  late final amount = TextEditingController(text: '${widget.tx.amount.major}');
+  late final note = TextEditingController(text: widget.tx.note ?? '');
+  late DateTime date = widget.tx.date;
+  late String? categoryId = widget.tx.categoryId;
+
+  @override
+  void dispose() {
+    amount.dispose();
+    note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = FinanceScope.of(context);
+    final app = ctrl.app;
+    final cats = widget.tx.type == TransactionType.income
+        ? app.categories.where((c) => c.kind == CategoryKind.income)
+        : app.categories.where((c) => c.kind == CategoryKind.expense);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Edit ${widget.tx.type.name}', style: Theme.of(context).textTheme.titleLarge),
+            if (widget.tx.allocationItemId != null)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Linked to a plan — only date and note can change.'),
+              ),
+            const SizedBox(height: 12),
+            AmountField(controller: amount),
+            TimelineTile(
+              label: 'Date',
+              date: date,
+              onPick: () async {
+                final picked = await pickTimeline(context, initial: date);
+                if (picked != null) setState(() => date = picked);
+              },
+            ),
+            if (widget.tx.type == TransactionType.expense || widget.tx.type == TransactionType.income)
+              DropdownButtonFormField<String>(
+                initialValue: categoryId,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: cats
+                    .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                    .toList(),
+                onChanged: (v) => setState(() => categoryId = v),
+              ),
+            TextField(controller: note, decoration: const InputDecoration(labelText: 'Note')),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () async {
+                final ok = await ctrl.run(() async {
+                  await app.updateTransaction(
+                    FinanceTransaction(
+                      id: widget.tx.id,
+                      type: widget.tx.type,
+                      amount: Money.parse(amount.text),
+                      date: date,
+                      accountId: widget.tx.accountId,
+                      toAccountId: widget.tx.toAccountId,
+                      categoryId: categoryId,
+                      note: note.text,
+                      goalId: widget.tx.goalId,
+                      investmentId: widget.tx.investmentId,
+                      allocationItemId: widget.tx.allocationItemId,
+                      createdAt: widget.tx.createdAt,
+                    ),
+                  );
+                });
+                if (ok && context.mounted) Navigator.pop(context);
+              },
+              child: const Text('Save changes'),
             ),
           ],
         ),

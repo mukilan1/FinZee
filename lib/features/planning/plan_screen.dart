@@ -6,9 +6,19 @@ import '../../core/features.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
+import '../../shared/widgets/list_controls.dart';
+import '../../shared/widgets/transaction_row.dart';
 
-class PlanScreen extends StatelessWidget {
+class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key});
+  @override
+  State<PlanScreen> createState() => _PlanScreenState();
+}
+
+class _PlanScreenState extends State<PlanScreen> {
+  String query = '';
+  String? statusFilter;
+  String sort = 'name';
 
   @override
   Widget build(BuildContext context) {
@@ -17,89 +27,153 @@ class PlanScreen extends StatelessWidget {
     if (!app.enabled(AppFeature.salaryPlanning)) {
       return const EmptyState(
         title: 'Salary planning is off',
-        bodyText: 'Enable Salary Planning in More → Features. Your data stays safe.',
+        subtitle: 'Enable Salary Planning in More → Features. Your data stays safe.',
       );
     }
     final planned = app.allocations.fold(const Money(0), (p, a) => p + a.plannedAmount);
     final unallocated = (app.plan?.expectedIncome ?? const Money(0)) - planned;
-    return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text('Monthly plan', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          Text(app.plan?.periodKey ?? 'No plan generated yet',
-              style: const TextStyle(color: FinzeeColors.textSecondary)),
-          const SizedBox(height: 16),
-          FinzeeCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Expected income  ${(app.plan?.expectedIncome ?? app.salary?.baseAmount ?? const Money(0)).format()}',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                const SizedBox(height: 8),
-                Text('Planned ${planned.format()}'),
-                Text('Unallocated ${unallocated.format()}'),
-                if (app.plan?.confirmed == true)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text('Confirmed', style: TextStyle(color: FinzeeColors.income)),
-                  ),
-              ],
-            ),
+    var items = app.allocations.where((a) {
+      if (statusFilter != null && a.status.name != statusFilter) return false;
+      if (query.isNotEmpty && !a.name.toLowerCase().contains(query.toLowerCase())) return false;
+      return true;
+    }).toList();
+    items.sort((a, b) => switch (sort) {
+          'amount' => b.plannedAmount.minor.compareTo(a.plannedAmount.minor),
+          'date' => a.sortOrder.compareTo(b.sortOrder),
+          _ => a.name.compareTo(b.name),
+        });
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Text('Monthly plan', style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 8),
+        Text(app.plan?.periodKey ?? 'No plan generated yet',
+            style: const TextStyle(color: FinzeeColors.textSecondary)),
+        const SizedBox(height: 16),
+        FinzeeCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Expected income  ${(app.plan?.expectedIncome ?? app.salary?.baseAmount ?? const Money(0)).format()}',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+              const SizedBox(height: 8),
+              Text('Planned ${planned.format()}'),
+              Text('Unallocated ${unallocated.format()}'),
+              if (app.plan?.confirmed == true)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text('Confirmed', style: TextStyle(color: FinzeeColors.income)),
+                ),
+              TextButton(
+                onPressed: app.plan == null ? null : () => _editExpected(context),
+                child: const Text('Edit expected income'),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: () => ctrl.run(app.generateThisMonth),
-            child: const Text('Generate this month'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton(
-            onPressed: app.plan == null ? null : () => ctrl.run(app.confirmThisMonth),
-            child: const Text('Confirm plan'),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton(
-            onPressed: app.salary == null
-                ? null
-                : () => ctrl.run(app.recordSalaryIncome),
-            child: const Text('Record salary as income'),
-          ),
-          const SizedBox(height: 20),
-          if (app.allocations.isEmpty)
-            const EmptyState(title: 'No allocations', subtitle: 'Generate a plan or add a monthly template in More.')
-          else
-            ...app.allocations.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _AllocationTile(item: item),
-                )),
+        ),
+        const SizedBox(height: 12),
+        FilledButton(
+          onPressed: () => ctrl.run(app.generateThisMonth),
+          child: const Text('Generate this month'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: app.plan == null ? null : () => ctrl.run(app.confirmThisMonth),
+          child: const Text('Confirm plan'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: app.salary == null ? null : () => ctrl.run(app.recordSalaryIncome),
+          child: const Text('Record salary as income'),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: app.plan == null ? null : () => _addAllocation(context),
+          icon: const Icon(Icons.add),
+          label: const Text('Add allocation'),
+        ),
+        const SizedBox(height: 16),
+        ListControls(
+          query: query,
+          onQuery: (v) => setState(() => query = v),
+          hint: 'Search allocations',
+          filters: AllocationStatus.values.map((s) => s.name).toList(),
+          selectedFilter: statusFilter,
+          onFilter: (v) => setState(() => statusFilter = v),
+          sorts: const [('name', 'Name'), ('amount', 'Amount'), ('date', 'Order')],
+          sortId: sort,
+          onSort: (v) => setState(() => sort = v),
+        ),
+        const SizedBox(height: 12),
+        if (items.isEmpty)
+          const EmptyState(title: 'No allocations', subtitle: 'Generate a plan or add an allocation.')
+        else
+          ...items.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _AllocationTile(item: item),
+              )),
+      ],
+    );
+  }
+
+  Future<void> _editExpected(BuildContext context) async {
+    final app = FinanceScope.of(context).app;
+    final amount = TextEditingController(text: '${app.plan!.expectedIncome.major}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Expected income'),
+        content: AmountField(controller: amount),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
         ],
       ),
     );
+    if (ok == true && context.mounted) {
+      await FinanceScope.of(context).run(() => app.updatePlan(expectedIncome: Money.parse(amount.text)));
+    }
   }
-}
 
-class EmptyState extends StatelessWidget {
-  const EmptyState({super.key, required this.title, this.subtitle, this.bodyText});
-  final String title;
-  final String? subtitle;
-  final String? bodyText;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Text(subtitle ?? bodyText ?? '', textAlign: TextAlign.center, style: const TextStyle(color: FinzeeColors.textSecondary)),
+  Future<void> _addAllocation(BuildContext context) async {
+    final app = FinanceScope.of(context).app;
+    final name = TextEditingController();
+    final amount = TextEditingController();
+    var kind = AllocationKind.expense;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: const Text('Add allocation'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+              AmountField(controller: amount, label: 'Planned'),
+              DropdownButtonFormField<AllocationKind>(
+                initialValue: kind,
+                items: AllocationKind.values
+                    .map((k) => DropdownMenuItem(value: k, child: Text(k.name)))
+                    .toList(),
+                onChanged: (v) => setSt(() => kind = v ?? kind),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Add')),
           ],
         ),
       ),
     );
+    if (ok == true && context.mounted) {
+      await FinanceScope.of(context).run(
+        () => app.addAllocation(
+          name: name.text.trim(),
+          kind: kind,
+          plannedAmount: Money.parse(amount.text),
+        ),
+      );
+    }
   }
 }
 
@@ -121,11 +195,27 @@ class _AllocationTile extends StatelessWidget {
               _StatusPill(status: item.status),
             ],
           ),
-          Text('${item.plannedAmount.format()} planned'),
+          Text('${item.plannedAmount.format()} planned · ${item.kind.name}'),
           if (item.actualAmount != null) Text('${item.actualAmount!.format()} actual'),
           if (item.skipNote != null) Text(item.skipNote!, style: const TextStyle(color: FinzeeColors.textSecondary)),
-          if (item.status == AllocationStatus.pending ||
-              item.status == AllocationStatus.partial) ...[
+          Wrap(
+            spacing: 8,
+            children: [
+              if (item.status == AllocationStatus.pending || item.status == AllocationStatus.partial)
+                TextButton(onPressed: () => _edit(context), child: const Text('Edit')),
+              if (item.status == AllocationStatus.pending)
+                TextButton(
+                  onPressed: () async {
+                    final ok = await confirmDelete(context, title: 'Delete allocation?');
+                    if (ok && context.mounted) {
+                      await ctrl.run(() => app.deleteAllocation(item.id));
+                    }
+                  },
+                  child: const Text('Delete'),
+                ),
+            ],
+          ),
+          if (item.status == AllocationStatus.pending || item.status == AllocationStatus.partial) ...[
             const SizedBox(height: 8),
             Row(
               children: [
@@ -133,9 +223,7 @@ class _AllocationTile extends StatelessWidget {
                   child: FilledButton(
                     onPressed: () async {
                       if (app.accounts.isEmpty) return;
-                      final amount = TextEditingController(
-                        text: '${item.plannedAmount.major}',
-                      );
+                      final amount = TextEditingController(text: '${item.plannedAmount.major}');
                       var accountId = app.accounts.any((a) => a.id == 'acc_bank')
                           ? 'acc_bank'
                           : app.accounts.first.id;
@@ -146,14 +234,7 @@ class _AllocationTile extends StatelessWidget {
                           content: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              TextField(
-                                controller: amount,
-                                decoration: const InputDecoration(
-                                  labelText: 'Actual amount',
-                                  prefixText: '₹ ',
-                                ),
-                              ),
-                              const SizedBox(height: 8),
+                              AmountField(controller: amount, label: 'Actual amount'),
                               DropdownButtonFormField<String>(
                                 initialValue: accountId,
                                 decoration: const InputDecoration(labelText: 'From account'),
@@ -172,11 +253,7 @@ class _AllocationTile extends StatelessWidget {
                       );
                       if (confirmed == true) {
                         await ctrl.run(
-                          () => app.completeAllocation(
-                            item.id,
-                            Money.parse(amount.text),
-                            accountId,
-                          ),
+                          () => app.completeAllocation(item.id, Money.parse(amount.text), accountId),
                         );
                       }
                     },
@@ -228,6 +305,62 @@ class _AllocationTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _edit(BuildContext context) async {
+    final app = FinanceScope.of(context).app;
+    final name = TextEditingController(text: item.name);
+    final amount = TextEditingController(text: '${item.plannedAmount.major}');
+    var kind = item.kind;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: const Text('Edit allocation'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+              AmountField(controller: amount, label: 'Planned'),
+              DropdownButtonFormField<AllocationKind>(
+                initialValue: kind,
+                items: AllocationKind.values
+                    .map((k) => DropdownMenuItem(value: k, child: Text(k.name)))
+                    .toList(),
+                onChanged: (v) => setSt(() => kind = v ?? kind),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && context.mounted) {
+      await FinanceScope.of(context).run(
+        () => app.updateAllocation(
+          AllocationItem(
+            id: item.id,
+            planId: item.planId,
+            name: name.text.trim(),
+            kind: kind,
+            plannedAmount: Money.parse(amount.text),
+            actualAmount: item.actualAmount,
+            status: item.status,
+            categoryId: item.categoryId,
+            goalId: item.goalId,
+            investmentId: item.investmentId,
+            billId: item.billId,
+            loanId: item.loanId,
+            accountId: item.accountId,
+            skipReason: item.skipReason,
+            skipNote: item.skipNote,
+            sortOrder: item.sortOrder,
+          ),
+        ),
+      );
+    }
   }
 }
 

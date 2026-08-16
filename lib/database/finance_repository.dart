@@ -245,6 +245,85 @@ class FinanceRepository {
     await (db.delete(db.transactions)..where((t) => t.id.equals(id))).go();
   }
 
+  Future<void> upsertTransaction(FinanceTransaction tx) async {
+    await db.into(db.transactions).insertOnConflictUpdate(
+          TransactionsCompanion.insert(
+            id: tx.id,
+            type: tx.type.name,
+            amountMinor: tx.amount.minor,
+            date: tx.date,
+            accountId: tx.accountId,
+            toAccountId: Value(tx.toAccountId),
+            categoryId: Value(tx.categoryId),
+            subcategoryId: Value(tx.subcategoryId),
+            paymentMethod: Value(tx.paymentMethod),
+            incomeSourceId: Value(tx.incomeSourceId),
+            note: Value(tx.note),
+            tagsJson: Value('[${tx.tags.map((e) => '"$e"').join(',')}]'),
+            attachmentPath: Value(tx.attachmentPath),
+            allocationItemId: Value(tx.allocationItemId),
+            goalId: Value(tx.goalId),
+            investmentId: Value(tx.investmentId),
+            createdAt: tx.createdAt,
+          ),
+        );
+  }
+
+  Future<void> deleteAccount(String id) async {
+    await (db.delete(db.accounts)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteCategory(String id) async {
+    await (db.delete(db.categories)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteAllocation(String id) async {
+    await (db.delete(db.allocationItems)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteSavingsGoal(String id) async {
+    await (db.delete(db.savingsGoals)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteInvestment(String id) async {
+    await (db.delete(db.investments)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteBudget(String id) async {
+    await (db.delete(db.budgets)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteBill(String id) async {
+    await (db.delete(db.bills)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteLoan(String id) async {
+    await (db.delete(db.loans)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteFinancialGoal(String id) async {
+    await (db.delete(db.financialGoals)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> deleteNote(String id) async {
+    await (db.delete(db.notes)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> upsertNote(FinanceNote note) async {
+    await db.into(db.notes).insertOnConflictUpdate(
+          NotesCompanion.insert(
+            id: note.id,
+            body: note.body,
+            createdAt: note.createdAt,
+            transactionId: Value(note.transactionId),
+            allocationId: Value(note.allocationId),
+            goalId: Value(note.goalId),
+            monthKey: Value(note.monthKey),
+            accountId: Value(note.accountId),
+          ),
+        );
+  }
+
   Future<SalaryProfile?> activeSalary() async {
     final row = await (db.select(db.salaryProfiles)
           ..where((t) => t.active.equals(true))
@@ -589,6 +668,11 @@ class FinanceRepository {
     await db.into(db.appSettings).insertOnConflictUpdate(
           AppSettingsCompanion.insert(key: key, value: value),
         );
+  }
+
+  Future<Map<String, String>> allSettings() async {
+    final rows = await db.select(db.appSettings).get();
+    return {for (final row in rows) row.key: row.value};
   }
 
   Future<void> clearAll() async {

@@ -471,10 +471,26 @@ class LocalAlert {
     required this.title,
     required this.body,
     required this.kind,
+    this.featureKey,
+    this.severity = 1,
+    this.read = false,
   });
 
   final String id;
   final String title;
   final String body;
   final String kind;
+  final String? featureKey;
+  final int severity;
+  final bool read;
+
+  LocalAlert copyWith({bool? read}) => LocalAlert(
+        id: id,
+        title: title,
+        body: body,
+        kind: kind,
+        featureKey: featureKey,
+        severity: severity,
+        read: read ?? this.read,
+      );
 }

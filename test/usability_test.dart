@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:finzee/application/finance_app.dart';
 import 'package:finzee/core/errors.dart';
 import 'package:finzee/core/features.dart';
@@ -13,7 +14,7 @@ void main() {
   late FinanceApp app;
 
   setUp(() async {
-    db = AppDatabase.memory();
+    db = AppDatabase(NativeDatabase.memory());
     app = FinanceApp(FinanceRepository(db));
     await app.bootstrap();
   });

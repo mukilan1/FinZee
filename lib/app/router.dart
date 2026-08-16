@@ -7,7 +7,7 @@ import '../features/planning/plan_screen.dart';
 import '../features/transactions/transactions_screen.dart';
 import '../shared/widgets/app_shell.dart';
 
-final appRouter = GoRouter(
+GoRouter createAppRouter() => GoRouter(
   initialLocation: '/home',
   routes: [
     StatefulShellRoute.indexedStack(

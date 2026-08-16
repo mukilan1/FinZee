@@ -48,6 +48,7 @@ class BackupService {
     final notes = await repo.notes();
     final audits = await repo.auditLog();
     final finGoals = await repo.financialGoals();
+    final settings = await repo.allSettings();
 
     final payload = {
       'schemaVersion': backupSchemaVersion,
@@ -219,6 +220,7 @@ class BackupService {
                 'payload': a.payload,
               })
           .toList(),
+      'settings': settings,
     };
     await repo.audit('BACKUP_CREATED');
     return const JsonEncoder.withIndent('  ').convert(payload);
@@ -476,6 +478,12 @@ class BackupService {
           createdAt: DateTime.parse(t['createdAt'] as String),
         ),
       );
+    }
+    final settings = map['settings'];
+    if (settings is Map) {
+      for (final entry in settings.entries) {
+        await repo.setSetting('${entry.key}', '${entry.value}');
+      }
     }
   }
 }
