@@ -6,6 +6,7 @@ import '../../core/features.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
+import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 
@@ -73,17 +74,36 @@ class _PlanScreenState extends State<PlanScreen> {
         ),
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: () => ctrl.run(app.generateThisMonth),
+          onPressed: () => runWithFeedback(
+            context,
+            ctrl,
+            app.generateThisMonth,
+            successMessage: 'Monthly plan generated.',
+          ),
           child: const Text('Generate this month'),
         ),
         const SizedBox(height: 8),
         OutlinedButton(
-          onPressed: app.plan == null ? null : () => ctrl.run(app.confirmThisMonth),
+          onPressed: app.plan == null
+              ? null
+              : () => runWithFeedback(
+                    context,
+                    ctrl,
+                    app.confirmThisMonth,
+                    successMessage: 'Monthly plan confirmed.',
+                  ),
           child: const Text('Confirm plan'),
         ),
         const SizedBox(height: 8),
         OutlinedButton(
-          onPressed: app.salary == null ? null : () => ctrl.run(app.recordSalaryIncome),
+          onPressed: app.salary == null
+              ? null
+              : () => runWithFeedback(
+                    context,
+                    ctrl,
+                    app.recordSalaryIncome,
+                    successMessage: 'Salary recorded as income.',
+                  ),
           child: const Text('Record salary as income'),
         ),
         const SizedBox(height: 8),
@@ -131,7 +151,12 @@ class _PlanScreenState extends State<PlanScreen> {
       ),
     );
     if (ok == true && context.mounted) {
-      await FinanceScope.of(context).run(() => app.updatePlan(expectedIncome: Money.parse(amount.text)));
+      await runWithFeedback(
+        context,
+        FinanceScope.of(context),
+        () => app.updatePlan(expectedIncome: Money.parse(amount.text)),
+        successMessage: 'Expected income updated.',
+      );
     }
   }
 
@@ -166,12 +191,15 @@ class _PlanScreenState extends State<PlanScreen> {
       ),
     );
     if (ok == true && context.mounted) {
-      await FinanceScope.of(context).run(
+      await runWithFeedback(
+        context,
+        FinanceScope.of(context),
         () => app.addAllocation(
           name: name.text.trim(),
           kind: kind,
           plannedAmount: Money.parse(amount.text),
         ),
+        successMessage: 'Allocation added.',
       );
     }
   }
@@ -251,9 +279,12 @@ class _AllocationTile extends StatelessWidget {
                           ],
                         ),
                       );
-                      if (confirmed == true) {
-                        await ctrl.run(
+                      if (confirmed == true && context.mounted) {
+                        await runWithFeedback(
+                          context,
+                          ctrl,
                           () => app.completeAllocation(item.id, Money.parse(amount.text), accountId),
+                          successMessage: 'Allocation completed.',
                         );
                       }
                     },
@@ -292,8 +323,13 @@ class _AllocationTile extends StatelessWidget {
                           ),
                         ),
                       );
-                      if (ok == true) {
-                        await ctrl.run(() => app.skipAllocation(item.id, reason, note.text));
+                      if (ok == true && context.mounted) {
+                        await runWithFeedback(
+                          context,
+                          ctrl,
+                          () => app.skipAllocation(item.id, reason, note.text),
+                          successMessage: 'Allocation skipped.',
+                        );
                       }
                     },
                     child: const Text('Skip'),
@@ -338,7 +374,9 @@ class _AllocationTile extends StatelessWidget {
       ),
     );
     if (ok == true && context.mounted) {
-      await FinanceScope.of(context).run(
+      await runWithFeedback(
+        context,
+        FinanceScope.of(context),
         () => app.updateAllocation(
           AllocationItem(
             id: item.id,
@@ -359,6 +397,7 @@ class _AllocationTile extends StatelessWidget {
             sortOrder: item.sortOrder,
           ),
         ),
+        successMessage: 'Allocation updated.',
       );
     }
   }

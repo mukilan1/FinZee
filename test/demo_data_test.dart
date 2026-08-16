@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:finzee/application/app_lock_service.dart';
 import 'package:finzee/application/demo_data.dart';
 import 'package:finzee/application/finance_app.dart';
 import 'package:finzee/core/errors.dart';
@@ -8,6 +9,8 @@ import 'package:finzee/database/app_database.dart';
 import 'package:finzee/database/finance_repository.dart';
 import 'package:finzee/domain/entities.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/mock_app_lock.dart';
 
 void main() {
   late AppDatabase db;
@@ -191,15 +194,36 @@ void main() {
     expect(reversed.currentAmount, before.currentAmount);
   });
 
-  test('PIN lock verifies and rejects the wrong code', () async {
-    await app.enablePin('2468');
-    expect(app.lockEnabled, isTrue);
-    app.unlocked = false;
-    expect(() => app.unlockWithPin('0000'), throwsA(isA<AuthenticationError>()));
-    await app.unlockWithPin('2468');
-    expect(app.unlocked, isTrue);
-    await app.disablePin();
-    expect(app.lockEnabled, isFalse);
+  test('device lock verifies before unlock', () async {
+    final lockedApp = FinanceApp(
+      FinanceRepository(db),
+      lockService: AppLockService(
+        authenticateOverride: (reason) async => !reason.contains('Unlock'),
+        deviceSupportedOverride: () async => true,
+      ),
+    );
+    await lockedApp.bootstrap();
+    await DemoDataLoader(lockedApp).load();
+    await lockedApp.enableAppLock();
+    expect(lockedApp.lockEnabled, isTrue);
+    lockedApp.unlocked = false;
+    final denied = await lockedApp.unlockApp();
+    expect(denied, isFalse);
+    expect(lockedApp.unlocked, isFalse);
+
+    final unlockedApp = FinanceApp(
+      FinanceRepository(db),
+      lockService: mockAppLock(),
+    );
+    await unlockedApp.bootstrap();
+    await DemoDataLoader(unlockedApp).load();
+    await unlockedApp.enableAppLock();
+    unlockedApp.unlocked = false;
+    final allowed = await unlockedApp.unlockApp();
+    expect(allowed, isTrue);
+    expect(unlockedApp.unlocked, isTrue);
+    await unlockedApp.disableAppLock();
+    expect(unlockedApp.lockEnabled, isFalse);
   });
 
   test('reloading sample data with reset reseeds the household', () async {

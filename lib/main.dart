@@ -17,7 +17,7 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final db = AppDatabase.open();
   final controller = FinanceController(
-    FinanceApp(FinanceRepository(db), loadDemoIfEmpty: true),
+    FinanceApp(FinanceRepository(db)),
   );
   await controller.start();
   runApp(FinzeeApp(controller: controller));

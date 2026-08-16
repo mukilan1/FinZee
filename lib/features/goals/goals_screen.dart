@@ -7,6 +7,7 @@ import '../../core/ids.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
+import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 
@@ -153,7 +154,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
       ),
     );
     if (ok == true && context.mounted) {
-      await FinanceScope.of(context).run(
+      final ctrl = FinanceScope.of(context);
+      await runWithFeedback(
+        context,
+        ctrl,
         () => app.upsertSavingsGoal(
           SavingsGoal(
             id: existing?.id ?? newId(),
@@ -166,6 +170,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
             targetDate: targetDate,
           ),
         ),
+        successMessage: existing == null ? 'Savings goal added.' : 'Savings goal updated.',
       );
     }
   }
@@ -215,7 +220,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
       ),
     );
     if (ok == true && context.mounted) {
-      await FinanceScope.of(context).run(
+      final ctrl = FinanceScope.of(context);
+      await runWithFeedback(
+        context,
+        ctrl,
         () => app.upsertFinancialGoal(
           FinancialGoal(
             id: existing?.id ?? newId(),
@@ -227,6 +235,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
             deadline: deadline,
           ),
         ),
+        successMessage: existing == null ? 'Financial goal added.' : 'Financial goal updated.',
       );
     }
   }

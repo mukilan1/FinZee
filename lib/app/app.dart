@@ -15,8 +15,31 @@ class FinzeeApp extends StatefulWidget {
   State<FinzeeApp> createState() => _FinzeeAppState();
 }
 
-class _FinzeeAppState extends State<FinzeeApp> {
+class _FinzeeAppState extends State<FinzeeApp> with WidgetsBindingObserver {
   late final GoRouter _router = createAppRouter();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      if (widget.controller.app.lockEnabled) {
+        widget.controller.lockApp();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +54,8 @@ class _FinzeeAppState extends State<FinzeeApp> {
             theme: buildFinzeeTheme(),
             routerConfig: _router,
             builder: (context, child) {
-              final locked = widget.controller.app.lockEnabled && !widget.controller.app.unlocked;
+              final locked =
+                  widget.controller.app.lockEnabled && !widget.controller.app.unlocked;
               return Stack(
                 children: [
                   child ?? const SizedBox.shrink(),
@@ -54,17 +78,36 @@ class _LockGate extends StatefulWidget {
 }
 
 class _LockGateState extends State<_LockGate> {
-  final pin = TextEditingController();
+  bool _busy = false;
+  String? _message;
 
   @override
-  void dispose() {
-    pin.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _unlock());
+  }
+
+  Future<void> _unlock() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    final ctrl = FinanceScope.of(context);
+    final ok = await ctrl.app.unlockApp();
+    if (!mounted) return;
+    if (ok) {
+      ctrl.notifyListeners();
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _message = 'Unlock cancelled. Use your phone\'s fingerprint, face, or screen lock.';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = FinanceScope.of(context);
     return Material(
       color: FinzeeColors.background,
       child: SafeArea(
@@ -73,22 +116,33 @@ class _LockGateState extends State<_LockGate> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.lock_outline, size: 48, color: FinzeeColors.primaryDark),
+              const Icon(Icons.fingerprint, size: 48, color: FinzeeColors.primaryDark),
               const SizedBox(height: 16),
               Text('FinZee is locked', style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
-              const Text('Enter your local PIN. Nothing is sent anywhere.'),
-              const SizedBox(height: 24),
-              TextField(
-                controller: pin,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'PIN'),
+              const Text(
+                'Use your device screen lock to open FinZee. Nothing is sent anywhere.',
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => ctrl.run(() => ctrl.app.unlockWithPin(pin.text)),
-                child: const Text('Unlock'),
+              if (_message != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _message!,
+                  style: const TextStyle(color: FinzeeColors.expense),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: _busy ? null : _unlock,
+                icon: _busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.lock_open),
+                label: Text(_busy ? 'Waiting for device unlock…' : 'Unlock FinZee'),
               ),
             ],
           ),

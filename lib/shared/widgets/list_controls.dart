@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import 'feedback.dart';
 
 class ListControls extends StatelessWidget {
   const ListControls({
@@ -195,12 +196,15 @@ Future<bool> confirmAndErase(
   if (!ok || !context.mounted) return false;
   final success = await erase();
   if (!context.mounted) return success;
-  await showErasedConfirmation(
-    context,
-    title: success ? doneTitle : 'Not deleted',
-    body: success ? doneBody : (failBody?.call() ?? 'Nothing was erased.'),
-    success: success,
-  );
+  if (success) {
+    showFinzeeSnackBar(context, doneBody);
+  } else {
+    showFinzeeSnackBar(
+      context,
+      failBody?.call() ?? 'Nothing was erased.',
+      error: true,
+    );
+  }
   return success;
 }
 
@@ -218,23 +222,26 @@ Future<void> confirmEraseFromEditor({
   final success = await erase();
   if (success && dialogContext.mounted) Navigator.pop(dialogContext, false);
   if (!pageContext.mounted) return;
-  await showErasedConfirmation(
-    pageContext,
-    title: success ? doneTitle : 'Not deleted',
-    body: success ? doneBody : (failBody?.call() ?? 'Nothing was erased.'),
-    success: success,
-  );
+  if (success) {
+    showFinzeeSnackBar(pageContext, doneBody);
+  } else {
+    showFinzeeSnackBar(
+      pageContext,
+      failBody?.call() ?? 'Nothing was erased.',
+      error: true,
+    );
+  }
 }
 
 class WipeDraft {
-  const WipeDraft({required this.phrase, this.pin});
+  const WipeDraft({required this.phrase});
   final String phrase;
-  final String? pin;
 }
 
 Future<WipeDraft?> collectWipeDraft(
   BuildContext context, {
-  required bool pinRequired,
+  required bool authRequired,
+  required Future<bool> Function(String reason) authenticate,
 }) async {
   final first = await showDialog<bool>(
     context: context,
@@ -258,7 +265,6 @@ Future<WipeDraft?> collectWipeDraft(
   if (first != true || !context.mounted) return null;
 
   final phrase = TextEditingController();
-  final pin = TextEditingController();
   final second = await showDialog<bool>(
     context: context,
     useRootNavigator: true,
@@ -274,15 +280,6 @@ Future<WipeDraft?> collectWipeDraft(
             controller: phrase,
             decoration: const InputDecoration(labelText: 'Type DELETE'),
           ),
-          if (pinRequired) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: pin,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'App PIN'),
-            ),
-          ],
         ],
       ),
       actions: [
@@ -296,7 +293,11 @@ Future<WipeDraft?> collectWipeDraft(
     ),
   );
   if (second != true) return null;
-  return WipeDraft(phrase: phrase.text, pin: pinRequired ? pin.text : null);
+  if (authRequired) {
+    final authed = await authenticate('Confirm deleting all FinZee data');
+    if (!authed) return null;
+  }
+  return WipeDraft(phrase: phrase.text);
 }
 
 class AddCta extends StatelessWidget {

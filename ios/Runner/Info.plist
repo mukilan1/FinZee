@@ -24,8 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>FinZee uses Face ID to unlock your local finance data.</string>
+	<key>NSLocalAuthenticationUsageDescription</key>
+	<string>FinZee uses your device screen lock to protect your local finance data.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

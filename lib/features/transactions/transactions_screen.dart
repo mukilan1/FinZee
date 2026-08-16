@@ -4,6 +4,7 @@ import '../../app/finance_scope.dart';
 import '../../app/theme.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
+import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 import 'add_sheet.dart';
@@ -128,14 +129,18 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                           () => app.deleteTransaction(tx.id),
                         );
                         if (context.mounted) {
-                          await showErasedConfirmation(
-                            context,
-                            title: success ? 'Erased' : 'Not deleted',
-                            body: success
-                                ? 'This transaction has been erased from FinZee on this device.'
-                                : (FinanceScope.of(context).error ?? 'Nothing was erased.'),
-                            success: success,
-                          );
+                          if (success) {
+                            showFinzeeSnackBar(
+                              context,
+                              'Transaction deleted from this device.',
+                            );
+                          } else {
+                            showFinzeeSnackBar(
+                              context,
+                              FinanceScope.of(context).error ?? 'Transaction was not deleted.',
+                              error: true,
+                            );
+                          }
                         }
                         return success;
                       },

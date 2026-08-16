@@ -10,6 +10,7 @@ import '../../core/ids.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
+import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 import '../manage/crud_pages.dart';
@@ -113,7 +114,9 @@ class _SalaryPageState extends State<SalaryPage> {
           FilledButton(
             onPressed: !app.enabled(AppFeature.salaryPlanning)
                 ? null
-                : () => FinanceScope.of(context).run(
+                : () => runWithFeedback(
+                      context,
+                      FinanceScope.of(context),
                       () => app.saveSalary(
                         SalaryProfile(
                           id: app.salary?.id ?? newId(),
@@ -123,6 +126,7 @@ class _SalaryPageState extends State<SalaryPage> {
                           effectiveFrom: effective,
                         ),
                       ),
+                      successMessage: 'Salary profile saved.',
                     ),
             child: const Text('Save salary'),
           ),
@@ -130,7 +134,12 @@ class _SalaryPageState extends State<SalaryPage> {
           OutlinedButton(
             onPressed: !app.enabled(AppFeature.salaryPlanning) || app.salary == null
                 ? null
-                : () => FinanceScope.of(context).run(app.recordSalaryIncome),
+                : () => runWithFeedback(
+                      context,
+                      FinanceScope.of(context),
+                      app.recordSalaryIncome,
+                      successMessage: 'This month\'s salary recorded as income.',
+                    ),
             child: const Text('Record this month\'s salary as income'),
           ),
           const SizedBox(height: 24),
@@ -247,14 +256,18 @@ class SampleDataPage extends StatelessWidget {
                 if (ok != true || !context.mounted) return;
                 final loaded = await ctrl.run(() => ctrl.app.loadSampleData(reset: true));
                 if (!context.mounted) return;
-                await showErasedConfirmation(
-                  context,
-                  title: loaded ? 'Sample data loaded' : 'Could not load sample',
-                  body: loaded
-                      ? 'Previous records on this device were erased and replaced with the sample household.'
-                      : (ctrl.error ?? 'Nothing was changed.'),
-                  success: loaded,
-                );
+                if (loaded) {
+                  showFinzeeSnackBar(
+                    context,
+                    'Sample household loaded. Your previous data on this device was replaced.',
+                  );
+                } else {
+                  showFinzeeSnackBar(
+                    context,
+                    ctrl.error ?? 'Could not load sample data.',
+                    error: true,
+                  );
+                }
               },
               child: const Text('Load sample household'),
             ),
@@ -280,7 +293,23 @@ class FeaturesPage extends StatelessWidget {
                 title: Text(f.label),
                 subtitle: const Text('OFF hides UI only — data is never deleted.'),
                 value: app.enabled(f),
-                onChanged: (v) => FinanceScope.of(context).run(() => app.setFeature(f, v)),
+                onChanged: (v) async {
+                  final ctrl = FinanceScope.of(context);
+                  final ok = await ctrl.run(() => app.setFeature(f, v));
+                  if (!context.mounted) return;
+                  if (ok) {
+                    showFinzeeSnackBar(
+                      context,
+                      v ? '${f.label} enabled.' : '${f.label} hidden. Your data is still saved.',
+                    );
+                  } else {
+                    showFinzeeSnackBar(
+                      context,
+                      ctrl.error ?? 'Could not update ${f.label}.',
+                      error: true,
+                    );
+                  }
+                },
               ),
             )
             .toList(),
@@ -306,12 +335,19 @@ class BackupPage extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () async {
+                final ctrl = FinanceScope.of(context);
                 final json = await app.backup.exportJson();
-                await FilePicker.platform.saveFile(
+                final saved = await FilePicker.platform.saveFile(
                   dialogTitle: 'Save FinZee backup',
                   fileName: 'finance_backup_v1_${DateTime.now().toIso8601String().substring(0, 10)}.json',
                   bytes: utf8.encode(json),
                 );
+                if (!context.mounted) return;
+                if (saved != null) {
+                  showFinzeeSnackBar(context, 'Backup exported successfully.');
+                } else {
+                  showFinzeeSnackBar(context, 'Backup export cancelled.', error: true);
+                }
               },
               child: const Text('Export backup'),
             ),
@@ -338,14 +374,18 @@ class BackupPage extends StatelessWidget {
                   await app.reload();
                 });
                 if (!context.mounted) return;
-                await showErasedConfirmation(
-                  context,
-                  title: restored ? 'Backup restored' : 'Restore failed',
-                  body: restored
-                      ? 'Previous data on this device was replaced with the backup. A safety copy was taken first.'
-                      : (ctrl.error ?? 'Nothing was changed.'),
-                  success: restored,
-                );
+                if (restored) {
+                  showFinzeeSnackBar(
+                    context,
+                    'Backup restored. A safety copy of your previous data was saved first.',
+                  );
+                } else {
+                  showFinzeeSnackBar(
+                    context,
+                    ctrl.error ?? 'Restore failed.',
+                    error: true,
+                  );
+                }
               },
               child: const Text('Restore backup'),
             ),
@@ -356,13 +396,29 @@ class BackupPage extends StatelessWidget {
   }
 }
 
-class SecurityPage extends StatelessWidget {
+class SecurityPage extends StatefulWidget {
   const SecurityPage({super.key});
+
+  @override
+  State<SecurityPage> createState() => _SecurityPageState();
+}
+
+class _SecurityPageState extends State<SecurityPage> {
+  bool? _deviceLockAvailable;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final available = await FinanceScope.of(context).app.deviceLockAvailable();
+      if (mounted) setState(() => _deviceLockAvailable = available);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final ctrl = FinanceScope.of(context);
-    final pin = TextEditingController();
+    final available = _deviceLockAvailable;
     return Scaffold(
       appBar: AppBar(title: const Text('Security')),
       body: Padding(
@@ -373,23 +429,39 @@ class SecurityPage extends StatelessWidget {
             Text(ctrl.app.lockEnabled ? 'App lock is ON' : 'App lock is OFF'),
             const SizedBox(height: 8),
             const Text(
-              'PIN is hashed and stored only on this device. There is no account or cloud login.',
+              'FinZee uses your phone\'s native screen lock — fingerprint, face, PIN, or pattern. '
+              'No separate FinZee password is stored.',
             ),
+            if (available == false) ...[
+              const SizedBox(height: 12),
+              const Text(
+                'Device security is not available here. Use a phone or tablet with a screen lock enabled.',
+                style: TextStyle(color: FinzeeColors.expense),
+              ),
+            ],
             const SizedBox(height: 16),
-            TextField(
-              controller: pin,
-              obscureText: true,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'PIN (min 4 digits)'),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () => ctrl.run(() => ctrl.app.enablePin(pin.text)),
-              child: const Text('Enable PIN lock'),
+            FilledButton.icon(
+              onPressed: available == false
+                  ? null
+                  : () => runWithFeedback(
+                        context,
+                        ctrl,
+                        ctrl.app.enableAppLock,
+                        successMessage: 'App lock enabled using your device security.',
+                      ),
+              icon: const Icon(Icons.fingerprint),
+              label: const Text('Enable device lock'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
-              onPressed: () => ctrl.run(ctrl.app.disablePin),
+              onPressed: !ctrl.app.lockEnabled
+                  ? null
+                  : () => runWithFeedback(
+                        context,
+                        ctrl,
+                        ctrl.app.disableAppLock,
+                        successMessage: 'App lock disabled.',
+                      ),
               child: const Text('Disable lock'),
             ),
           ],
