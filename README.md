@@ -1,27 +1,33 @@
 # FinZee
 
-**FinZee** is a personal Finance Management Application for tracking income, expenses, budgets, and financial reports in one place.
+100% offline, privacy-first personal finance manager for Flutter.
 
-This repository contains the **project report** for FinZee.
+There is **no** registration, login, cloud, backend, analytics, ads, or bank API. All data lives in local SQLite (Drift).
 
-## Documents
+## Modes
 
-- [Project Report](REPORT.md) — full academic-style report (problem, design, modules, implementation plan, testing, conclusion)
+- **Mode A** — track income, expenses, transfers, accounts, and reports (salary planning off).
+- **Mode B** — enable Salary Planning for monthly allocation, checklist, planned vs actual, skip reasons, and savings/investment integration.
 
-## Product summary
+One financial event is the source of truth: allocation → transaction → goal/account → dashboard → reports → audit.
 
-FinZee helps individuals and small households:
+## Run
 
-- Record income and expense transactions
-- Categorize spending
-- Set monthly budgets and see remaining limits
-- View dashboards (balance, cash flow, category mix)
-- Export simple reports for review
+Flutter SDK is not required to be globally installed if you already have it. From this folder:
 
-## Status
+```bash
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter test
+flutter run
+```
 
-Report published: August 2026.
+## Architecture
 
-## License
+`UI → FinanceApp (application) → domain services → FinanceRepository → Drift/SQLite`
 
-Use this report for learning and project documentation.
+See `.cursor/rules/finzee-architecture.mdc` for the ten production rules.
+
+## Tests
+
+`flutter test` covers money math, transfer/savings invariants, the salary→plan→goal journey, feature-toggle persistence, backup/restore, and a dashboard widget smoke test.

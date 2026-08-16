@@ -1,0 +1,52 @@
+---
+description: FinZee production architecture rules — shared financial model, feature toggles, no business logic in widgets
+alwaysApply: true
+---
+
+# FinZee Architecture Rules
+
+FinZee is a 100% offline, privacy-first Flutter personal finance app. There is no server, login, analytics, ads, or network sync.
+
+## Rule 1 — Check dependencies before implementing a feature
+
+Salary planning, savings, investments, bills, loans, and goals communicate through shared domain entities. Never implement a module that assumes another optional module is always on.
+
+## Rule 2 — One source of financial truth
+
+Never duplicate the same financial event. One transaction (or allocation completion that creates a transaction) must propagate to account balance, goals, dashboard, reports, and audit history.
+
+## Rule 3 — OFF does not mean DELETE
+
+Disabling a feature hides UI and stops automation. Database records stay. Historical reports stay valid. Re-enabling restores everything.
+
+## Rule 4 — No business logic in widgets
+
+UI → application service → domain logic → repository → Drift/SQLite.
+
+## Rule 5 — Every database change needs a migration
+
+Never change tables without a Drift migration.
+
+## Rule 6 — Tests for every major feature
+
+Unit tests for calculations/planning. Integration tests for Salary → Plan → Allocation → Transaction → Goal → Dashboard → Report.
+
+## Rule 7 — Confirm destructive operations
+
+Deletes, restore-overwrite, and feature-related data wipes require confirmation. Feature toggle OFF is not a wipe.
+
+## Rule 8 — Versioned backups
+
+JSON backup format is versioned (`finance_backup_v1`). Validate schema before restore. Create a safety backup before overwrite.
+
+## Rule 9 — No silent regressions
+
+Transfers are not expenses. Salary must not double-count. Savings/investments must not inflate income. Salary is never mandatory (Mode A works without it).
+
+## Rule 10 — Update integrations when a module changes
+
+Before completing a task, inspect affected modules (planning engine, calculations, reports, dashboard, backup).
+
+## Privacy
+
+No registration, login, email, cloud, backend, analytics SDK, ads, bank APIs, or network sync.
