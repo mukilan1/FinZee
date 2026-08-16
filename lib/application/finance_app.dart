@@ -1,7 +1,6 @@
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
-
+import '../application/app_lock_service.dart';
 import '../core/errors.dart';
 import '../core/features.dart';
 import '../core/ids.dart';
@@ -16,11 +15,16 @@ import 'financial_calculation_service.dart';
 import 'monthly_planning_service.dart';
 
 class FinanceApp {
-  FinanceApp(this.repo, {this.loadDemoIfEmpty = false})
-      : planning = MonthlyPlanningService(repo),
-        backup = BackupService(repo);
+  FinanceApp(
+    this.repo, {
+    this.loadDemoIfEmpty = false,
+    AppLockService? lockService,
+  })  : planning = MonthlyPlanningService(repo),
+        backup = BackupService(repo),
+        lockService = lockService ?? AppLockService();
 
   final FinanceRepository repo;
+  final AppLockService lockService;
   final MonthlyPlanningService planning;
   final BackupService backup;
   final calc = FinancialCalculationService();
@@ -317,11 +321,20 @@ class FinanceApp {
     if (!_lockEnabled) unlocked = true;
   }
 
-  Future<void> enablePin(String pin) async {
-    if (pin.length < 4) {
-      throw const AuthenticationError('PIN must be at least 4 digits.');
+  Future<bool> deviceLockAvailable() => lockService.isDeviceSupported();
+
+  Future<void> enableAppLock() async {
+    if (!await lockService.isDeviceSupported()) {
+      throw const AuthenticationError(
+        'Device security is not available on this device.',
+      );
     }
-    await repo.setSetting('pin_hash', _hash(pin));
+    final ok = await lockService.authenticate(
+      reason: 'Confirm enabling app lock for FinZee',
+    );
+    if (!ok) {
+      throw const AuthenticationError('Device authentication was cancelled.');
+    }
     await repo.setSetting('lock_enabled', '1');
     _lockEnabled = true;
     unlocked = true;
@@ -329,25 +342,36 @@ class FinanceApp {
     await reload();
   }
 
-  Future<void> disablePin() async {
+  Future<void> disableAppLock() async {
+    if (_lockEnabled) {
+      final ok = await lockService.authenticate(
+        reason: 'Confirm disabling app lock for FinZee',
+      );
+      if (!ok) {
+        throw const AuthenticationError('Device authentication was cancelled.');
+      }
+    }
     await repo.setSetting('lock_enabled', '0');
     _lockEnabled = false;
     unlocked = true;
+    await repo.audit('FEATURE_DISABLED', 'app_lock');
     await reload();
   }
 
-  Future<void> unlockWithPin(String pin) async {
-    final stored = await repo.setting('pin_hash');
-    if (stored == null) {
-      throw const AuthenticationError('No PIN configured.');
-    }
-    if (stored != _hash(pin)) {
-      throw const AuthenticationError('Incorrect PIN.');
-    }
-    unlocked = true;
+  Future<bool> unlockApp() async {
+    final ok = await lockService.authenticate(
+      reason: 'Unlock FinZee',
+    );
+    if (ok) unlocked = true;
+    return ok;
   }
 
-  String _hash(String pin) => sha256.convert(utf8.encode(pin)).toString();
+  void lockApp() {
+    if (_lockEnabled) unlocked = false;
+  }
+
+  Future<bool> authenticateSensitiveAction(String reason) =>
+      lockService.authenticate(reason: reason);
 
   Future<void> upsertAccount(Account account) async {
     requireValidCurrency(account.currency);
@@ -707,16 +731,15 @@ class FinanceApp {
 
   Future<void> wipeAllData({
     required String typedPhrase,
-    String? pin,
+    bool deviceAuthenticated = false,
   }) async {
     if (typedPhrase.trim() != 'DELETE') {
       throw const ValidationError('Type DELETE to confirm wiping this app.');
     }
-    if (_lockEnabled) {
-      final stored = await repo.setting('pin_hash');
-      if (stored == null || stored != _hash(pin ?? '')) {
-        throw const AuthenticationError('PIN is required to delete all data.');
-      }
+    if (_lockEnabled && !deviceAuthenticated) {
+      throw const AuthenticationError(
+        'Device authentication is required to delete all data.',
+      );
     }
     await repo.clearAll();
     await repo.seedDefaults();

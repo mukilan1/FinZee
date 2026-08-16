@@ -9,6 +9,8 @@ import 'package:finzee/database/finance_repository.dart';
 import 'package:finzee/domain/entities.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'support/mock_app_lock.dart';
+
 void main() {
   late AppDatabase db;
   late FinanceApp app;
@@ -155,21 +157,26 @@ void main() {
     expect(app.allocations.any((a) => a.name == 'Custom line edited'), isFalse);
   });
 
-  test('wipe requires DELETE and optional PIN', () async {
-    await app.addTransaction(
+  test('wipe requires DELETE and device auth when lock enabled', () async {
+    final lockedApp = FinanceApp(
+      FinanceRepository(db),
+      lockService: mockAppLock(),
+    );
+    await lockedApp.bootstrap();
+    await lockedApp.addTransaction(
       type: TransactionType.income,
       amount: Money.fromMajor(100),
       date: DateTime.now(),
       accountId: 'acc_bank',
     );
-    expect(() => app.wipeAllData(typedPhrase: 'nope'), throwsA(isA<ValidationError>()));
-    await app.enablePin('1234');
+    expect(() => lockedApp.wipeAllData(typedPhrase: 'nope'), throwsA(isA<ValidationError>()));
+    await lockedApp.enableAppLock();
     expect(
-      () => app.wipeAllData(typedPhrase: 'DELETE', pin: '0000'),
+      () => lockedApp.wipeAllData(typedPhrase: 'DELETE'),
       throwsA(isA<AuthenticationError>()),
     );
-    await app.wipeAllData(typedPhrase: 'DELETE', pin: '1234');
-    expect(app.transactions, isEmpty);
-    expect(app.accounts, isNotEmpty);
+    await lockedApp.wipeAllData(typedPhrase: 'DELETE', deviceAuthenticated: true);
+    expect(lockedApp.transactions, isEmpty);
+    expect(lockedApp.accounts, isNotEmpty);
   });
 }

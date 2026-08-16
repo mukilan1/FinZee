@@ -41,6 +41,11 @@ class FinanceController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void lockApp() {
+    app.lockApp();
+    notifyListeners();
+  }
+
   String _friendly(Object e) {
     final text = e.toString();
     final idx = text.indexOf(': ');

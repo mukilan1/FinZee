@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:finzee/application/finance_app.dart';
+import 'package:finzee/application/app_lock_service.dart';
 import 'package:finzee/core/errors.dart';
 import 'package:finzee/core/features.dart';
 import 'package:finzee/core/ids.dart';
@@ -8,6 +9,8 @@ import 'package:finzee/database/app_database.dart';
 import 'package:finzee/database/finance_repository.dart';
 import 'package:finzee/domain/entities.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/mock_app_lock.dart';
 
 void main() {
   late AppDatabase db;
@@ -200,15 +203,25 @@ void main() {
     expect(app.savingsGoals.first.currentAmount.isZero, true);
   });
 
-  test('PIN lock hashes and rejects a wrong PIN', () async {
-    await app.enablePin('1234');
-    expect(app.lockEnabled, isTrue);
-    expect(
-      () => app.unlockWithPin('0000'),
-      throwsA(isA<AuthenticationError>()),
+  test('fresh install does not auto-load demo data', () async {
+    expect(app.transactions, isEmpty);
+    expect(app.accounts, isNotEmpty);
+  });
+
+  test('app lock uses device authentication', () async {
+    final lockedApp = FinanceApp(
+      FinanceRepository(db),
+      lockService: mockAppLock(),
     );
-    await app.unlockWithPin('1234');
-    expect(app.unlocked, isTrue);
+    await lockedApp.bootstrap();
+    await lockedApp.enableAppLock();
+    expect(lockedApp.lockEnabled, isTrue);
+    lockedApp.unlocked = false;
+    final ok = await lockedApp.unlockApp();
+    expect(ok, isTrue);
+    expect(lockedApp.unlocked, isTrue);
+    await lockedApp.disableAppLock();
+    expect(lockedApp.lockEnabled, isFalse);
   });
 
   test('Money.parse rejects junk', () {

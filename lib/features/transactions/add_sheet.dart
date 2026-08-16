@@ -5,6 +5,7 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/list_controls.dart';
+import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/transaction_row.dart';
 
 Future<void> showAddSheet(BuildContext context, TransactionType type) async {
@@ -156,8 +157,10 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             ],
             FilledButton(
               onPressed: () async {
-                final ok = await ctrl.run(() async {
-                  await app.addTransaction(
+                final ok = await runWithFeedback(
+                  context,
+                  ctrl,
+                  () => app.addTransaction(
                     type: type,
                     amount: Money.parse(amount.text),
                     date: date,
@@ -166,8 +169,9 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                     categoryId: categoryId,
                     note: note.text,
                     goalId: goalId,
-                  );
-                });
+                  ),
+                  successMessage: '${type.name[0].toUpperCase()}${type.name.substring(1)} added.',
+                );
                 if (ok && context.mounted) Navigator.pop(context);
               },
               child: const Text('Save'),
@@ -274,8 +278,10 @@ class _EditTransactionSheetState extends State<_EditTransactionSheet> {
             ],
             FilledButton(
               onPressed: () async {
-                final ok = await ctrl.run(() async {
-                  await app.updateTransaction(
+                final ok = await runWithFeedback(
+                  context,
+                  ctrl,
+                  () => app.updateTransaction(
                     FinanceTransaction(
                       id: widget.tx.id,
                       type: widget.tx.type,
@@ -290,8 +296,9 @@ class _EditTransactionSheetState extends State<_EditTransactionSheet> {
                       allocationItemId: widget.tx.allocationItemId,
                       createdAt: widget.tx.createdAt,
                     ),
-                  );
-                });
+                  ),
+                  successMessage: 'Transaction updated.',
+                );
                 if (ok && context.mounted) Navigator.pop(context);
               },
               child: const Text('Save changes'),

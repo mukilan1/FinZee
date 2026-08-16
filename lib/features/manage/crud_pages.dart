@@ -7,6 +7,7 @@ import '../../core/ids.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
+import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 
@@ -149,7 +150,10 @@ class _AccountsPageState extends State<AccountsPage> {
       ),
     );
     if (saved == true && context.mounted) {
-      await FinanceScope.of(context).run(
+      final ctrl = FinanceScope.of(context);
+      await runWithFeedback(
+        context,
+        ctrl,
         () => app.upsertAccount(
           Account(
             id: existing?.id ?? newId(),
@@ -162,6 +166,7 @@ class _AccountsPageState extends State<AccountsPage> {
             createdAt: created,
           ),
         ),
+        successMessage: existing == null ? 'Account added.' : 'Account updated.',
       );
     }
   }
@@ -266,7 +271,10 @@ class _CategoriesPageState extends State<CategoriesPage> {
       ),
     );
     if (saved == true && name.text.trim().isNotEmpty && context.mounted) {
-      await FinanceScope.of(context).run(
+      final ctrl = FinanceScope.of(context);
+      await runWithFeedback(
+        context,
+        ctrl,
         () => app.upsertCategory(
           Category(
             id: existing?.id ?? newId(),
@@ -275,6 +283,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
             sortOrder: existing?.sortOrder ?? app.categories.length,
           ),
         ),
+        successMessage: existing == null ? 'Category added.' : 'Category updated.',
       );
     }
   }
@@ -413,7 +422,10 @@ class _InvestmentsPageState extends State<InvestmentsPage> {
       ),
     );
     if (saved == true && context.mounted) {
-      await FinanceScope.of(context).run(
+      final ctrl = FinanceScope.of(context);
+      await runWithFeedback(
+        context,
+        ctrl,
         () => app.upsertInvestment(
           Investment(
             id: existing?.id ?? newId(),
@@ -426,6 +438,7 @@ class _InvestmentsPageState extends State<InvestmentsPage> {
             notes: notes.text,
           ),
         ),
+        successMessage: existing == null ? 'Investment added.' : 'Investment updated.',
       );
     }
   }
@@ -515,7 +528,10 @@ class _BillsPageState extends State<BillsPage> {
       ),
     );
     if (saved == true && context.mounted) {
-      await FinanceScope.of(context).run(
+      final ctrl = FinanceScope.of(context);
+      await runWithFeedback(
+        context,
+        ctrl,
         () => app.upsertBill(
           RecurringBill(
             id: existing?.id ?? newId(),
@@ -526,6 +542,7 @@ class _BillsPageState extends State<BillsPage> {
             accountId: existing?.accountId,
           ),
         ),
+        successMessage: existing == null ? 'Bill added.' : 'Bill updated.',
       );
     }
   }
@@ -642,7 +659,10 @@ class _LoansPageState extends State<LoansPage> {
     );
     if (saved == true && context.mounted) {
       final p = Money.parse(principal.text);
-      await FinanceScope.of(context).run(
+      final ctrl = FinanceScope.of(context);
+      await runWithFeedback(
+        context,
+        ctrl,
         () => app.upsertLoan(
           Loan(
             id: existing?.id ?? newId(),
@@ -655,6 +675,7 @@ class _LoansPageState extends State<LoansPage> {
             remaining: remaining.text.isEmpty ? p : Money.parse(remaining.text),
           ),
         ),
+        successMessage: existing == null ? 'Loan added.' : 'Loan updated.',
       );
     }
   }
@@ -771,7 +792,10 @@ class _BudgetsPageState extends State<BudgetsPage> {
       ),
     );
     if (saved == true && context.mounted) {
-      await FinanceScope.of(context).run(
+      final ctrl = FinanceScope.of(context);
+      await runWithFeedback(
+        context,
+        ctrl,
         () => app.upsertBudget(
           Budget(
             id: existing?.id ?? newId(),
@@ -781,6 +805,7 @@ class _BudgetsPageState extends State<BudgetsPage> {
             month: period.month,
           ),
         ),
+        successMessage: existing == null ? 'Budget added.' : 'Budget updated.',
       );
     }
   }
@@ -873,10 +898,18 @@ class _NotesPageState extends State<NotesPage> {
       ),
     );
     if (saved == true && context.mounted) {
+      final ctrl = FinanceScope.of(context);
       if (existing == null) {
-        await FinanceScope.of(context).run(() => app.addNote(body.text));
+        await runWithFeedback(
+          context,
+          ctrl,
+          () => app.addNote(body.text),
+          successMessage: 'Note added.',
+        );
       } else {
-        await FinanceScope.of(context).run(
+        await runWithFeedback(
+          context,
+          ctrl,
           () => app.updateNote(
             FinanceNote(
               id: existing.id,
@@ -886,6 +919,7 @@ class _NotesPageState extends State<NotesPage> {
               goalId: existing.goalId,
             ),
           ),
+          successMessage: 'Note updated.',
         );
       }
     }
@@ -906,26 +940,37 @@ class DangerZonePage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Wipe every local record and start from empty default accounts. This needs two confirmations, typing DELETE, and your app PIN if a lock is set.',
+              'Wipe every local record and start from empty default accounts. This needs two confirmations, typing DELETE, and your device screen lock if app lock is enabled.',
             ),
             const SizedBox(height: 16),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: FinzeeColors.expense),
               onPressed: () async {
-                final draft = await collectWipeDraft(context, pinRequired: ctrl.app.lockEnabled);
+                final draft = await collectWipeDraft(
+                  context,
+                  authRequired: ctrl.app.lockEnabled,
+                  authenticate: ctrl.app.authenticateSensitiveAction,
+                );
                 if (draft == null || !context.mounted) return;
                 final ok = await ctrl.run(
-                  () => ctrl.app.wipeAllData(typedPhrase: draft.phrase, pin: draft.pin),
+                  () => ctrl.app.wipeAllData(
+                    typedPhrase: draft.phrase,
+                    deviceAuthenticated: ctrl.app.lockEnabled,
+                  ),
                 );
                 if (!context.mounted) return;
-                await showErasedConfirmation(
-                  context,
-                  title: ok ? 'All application data erased' : 'Wipe cancelled',
-                  body: ok
-                      ? 'Every account, transaction, plan, goal, and setting on this device is gone. Empty defaults were restored.'
-                      : (ctrl.error ?? 'Nothing was deleted.'),
-                  success: ok,
-                );
+                if (ok) {
+                  showFinzeeSnackBar(
+                    context,
+                    'All application data erased. Empty defaults were restored.',
+                  );
+                } else {
+                  showFinzeeSnackBar(
+                    context,
+                    ctrl.error ?? 'Nothing was deleted.',
+                    error: true,
+                  );
+                }
               },
               child: const Text('Delete entire application data'),
             ),

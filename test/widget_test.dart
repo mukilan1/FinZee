@@ -98,8 +98,9 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'DELETE');
     await tester.tap(find.text('Wipe everything'));
     await tester.pumpAndSettle();
-    expect(find.text('All application data erased'), findsOneWidget);
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
+    expect(
+      find.text('All application data erased. Empty defaults were restored.'),
+      findsOneWidget,
+    );
   });
 }
