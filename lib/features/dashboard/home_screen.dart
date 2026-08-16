@@ -189,24 +189,28 @@ class _Quick extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(28),
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: const BoxDecoration(
-              color: FinzeeColors.primarySoft,
-              shape: BoxShape.circle,
+    return Semantics(
+      button: true,
+      label: label,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(28),
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: FinzeeColors.primarySoft,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: FinzeeColors.primaryDark),
             ),
-            child: Icon(icon, color: FinzeeColors.primaryDark),
           ),
-        ),
-        const SizedBox(height: 6),
-        Text(label, style: const TextStyle(fontSize: 12, color: FinzeeColors.textSecondary)),
-      ],
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(fontSize: 12, color: FinzeeColors.textSecondary)),
+        ],
+      ),
     );
   }
 }

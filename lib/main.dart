@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import 'app/app.dart';
@@ -9,6 +11,9 @@ import 'database/finance_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    SemanticsBinding.instance.ensureSemantics();
+  }
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final db = AppDatabase.open();
   final controller = FinanceController(

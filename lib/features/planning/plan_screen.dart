@@ -205,12 +205,12 @@ class _AllocationTile extends StatelessWidget {
                 TextButton(onPressed: () => _edit(context), child: const Text('Edit')),
               if (item.status == AllocationStatus.pending)
                 TextButton(
-                  onPressed: () async {
-                    final ok = await confirmDelete(context, title: 'Delete allocation?');
-                    if (ok && context.mounted) {
-                      await ctrl.run(() => app.deleteAllocation(item.id));
-                    }
-                  },
+                  onPressed: () => confirmAndErase(
+                    context,
+                    title: 'Delete allocation?',
+                    erase: () => ctrl.run(() => app.deleteAllocation(item.id)),
+                    failBody: () => ctrl.error,
+                  ),
                   child: const Text('Delete'),
                 ),
             ],

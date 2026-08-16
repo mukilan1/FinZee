@@ -133,13 +133,13 @@ class _AccountsPageState extends State<AccountsPage> {
           actions: [
             if (existing != null)
               TextButton(
-                onPressed: () async {
-                  final ok = await confirmDelete(ctx, title: 'Delete account?');
-                  if (ok && ctx.mounted) Navigator.pop(ctx, false);
-                  if (ok && context.mounted) {
-                    await FinanceScope.of(context).run(() => app.deleteAccount(existing.id));
-                  }
-                },
+                onPressed: () => confirmEraseFromEditor(
+                  pageContext: context,
+                  dialogContext: ctx,
+                  title: 'Delete account?',
+                  erase: () => FinanceScope.of(context).run(() => app.deleteAccount(existing.id)),
+                  failBody: () => FinanceScope.of(context).error,
+                ),
                 child: const Text('Delete'),
               ),
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -251,13 +251,13 @@ class _CategoriesPageState extends State<CategoriesPage> {
           actions: [
             if (existing != null)
               TextButton(
-                onPressed: () async {
-                  final ok = await confirmDelete(ctx, title: 'Delete category?');
-                  if (ok && context.mounted) {
-                    await FinanceScope.of(context).run(() => app.deleteCategory(existing.id));
-                    if (ctx.mounted) Navigator.pop(ctx, false);
-                  }
-                },
+                onPressed: () => confirmEraseFromEditor(
+                  pageContext: context,
+                  dialogContext: ctx,
+                  title: 'Delete category?',
+                  erase: () => FinanceScope.of(context).run(() => app.deleteCategory(existing.id)),
+                  failBody: () => FinanceScope.of(context).error,
+                ),
                 child: const Text('Delete'),
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
@@ -398,13 +398,13 @@ class _InvestmentsPageState extends State<InvestmentsPage> {
           actions: [
             if (existing != null)
               TextButton(
-                onPressed: () async {
-                  final ok = await confirmDelete(ctx, title: 'Delete investment?');
-                  if (ok && context.mounted) {
-                    await FinanceScope.of(context).run(() => app.deleteInvestment(existing.id));
-                    if (ctx.mounted) Navigator.pop(ctx, false);
-                  }
-                },
+                onPressed: () => confirmEraseFromEditor(
+                  pageContext: context,
+                  dialogContext: ctx,
+                  title: 'Delete investment?',
+                  erase: () => FinanceScope.of(context).run(() => app.deleteInvestment(existing.id)),
+                  failBody: () => FinanceScope.of(context).error,
+                ),
                 child: const Text('Delete'),
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
@@ -501,13 +501,13 @@ class _BillsPageState extends State<BillsPage> {
         actions: [
           if (existing != null)
             TextButton(
-              onPressed: () async {
-                final ok = await confirmDelete(ctx, title: 'Delete bill?');
-                if (ok && context.mounted) {
-                  await FinanceScope.of(context).run(() => app.deleteBill(existing.id));
-                  if (ctx.mounted) Navigator.pop(ctx, false);
-                }
-              },
+              onPressed: () => confirmEraseFromEditor(
+                pageContext: context,
+                dialogContext: ctx,
+                title: 'Delete bill?',
+                erase: () => FinanceScope.of(context).run(() => app.deleteBill(existing.id)),
+                failBody: () => FinanceScope.of(context).error,
+              ),
               child: const Text('Delete'),
             ),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
@@ -626,13 +626,13 @@ class _LoansPageState extends State<LoansPage> {
           actions: [
             if (existing != null)
               TextButton(
-                onPressed: () async {
-                  final ok = await confirmDelete(ctx, title: 'Delete loan?');
-                  if (ok && context.mounted) {
-                    await FinanceScope.of(context).run(() => app.deleteLoan(existing.id));
-                    if (ctx.mounted) Navigator.pop(ctx, false);
-                  }
-                },
+                onPressed: () => confirmEraseFromEditor(
+                  pageContext: context,
+                  dialogContext: ctx,
+                  title: 'Delete loan?',
+                  erase: () => FinanceScope.of(context).run(() => app.deleteLoan(existing.id)),
+                  failBody: () => FinanceScope.of(context).error,
+                ),
                 child: const Text('Delete'),
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
@@ -756,13 +756,13 @@ class _BudgetsPageState extends State<BudgetsPage> {
           actions: [
             if (existing != null)
               TextButton(
-                onPressed: () async {
-                  final ok = await confirmDelete(ctx, title: 'Delete budget?');
-                  if (ok && context.mounted) {
-                    await FinanceScope.of(context).run(() => app.deleteBudget(existing.id));
-                    if (ctx.mounted) Navigator.pop(ctx, false);
-                  }
-                },
+                onPressed: () => confirmEraseFromEditor(
+                  pageContext: context,
+                  dialogContext: ctx,
+                  title: 'Delete budget?',
+                  erase: () => FinanceScope.of(context).run(() => app.deleteBudget(existing.id)),
+                  failBody: () => FinanceScope.of(context).error,
+                ),
                 child: const Text('Delete'),
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
@@ -858,13 +858,13 @@ class _NotesPageState extends State<NotesPage> {
           actions: [
             if (existing != null)
               TextButton(
-                onPressed: () async {
-                  final ok = await confirmDelete(ctx, title: 'Delete note?');
-                  if (ok && context.mounted) {
-                    await FinanceScope.of(context).run(() => app.deleteNote(existing.id));
-                    if (ctx.mounted) Navigator.pop(ctx, false);
-                  }
-                },
+                onPressed: () => confirmEraseFromEditor(
+                  pageContext: context,
+                  dialogContext: ctx,
+                  title: 'Delete note?',
+                  erase: () => FinanceScope.of(context).run(() => app.deleteNote(existing.id)),
+                  failBody: () => FinanceScope.of(context).error,
+                ),
                 child: const Text('Delete'),
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
@@ -914,8 +914,17 @@ class DangerZonePage extends StatelessWidget {
               onPressed: () async {
                 final draft = await collectWipeDraft(context, pinRequired: ctrl.app.lockEnabled);
                 if (draft == null || !context.mounted) return;
-                await ctrl.run(
+                final ok = await ctrl.run(
                   () => ctrl.app.wipeAllData(typedPhrase: draft.phrase, pin: draft.pin),
+                );
+                if (!context.mounted) return;
+                await showErasedConfirmation(
+                  context,
+                  title: ok ? 'All application data erased' : 'Wipe cancelled',
+                  body: ok
+                      ? 'Every account, transaction, plan, goal, and setting on this device is gone. Empty defaults were restored.'
+                      : (ctrl.error ?? 'Nothing was deleted.'),
+                  success: ok,
                 );
               },
               child: const Text('Delete entire application data'),

@@ -114,14 +114,32 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         padding: const EdgeInsets.only(right: 16),
                         child: const Icon(Icons.delete, color: Colors.white),
                       ),
-                      confirmDismiss: (_) => confirmDelete(
-                        context,
-                        title: 'Delete transaction?',
-                        body: tx.allocationItemId == null
-                            ? 'This cannot be undone.'
-                            : 'Allocation-linked transactions cannot be deleted.',
-                      ),
-                      onDismissed: (_) => FinanceScope.of(context).run(() => app.deleteTransaction(tx.id)),
+                      confirmDismiss: (_) async {
+                        final linked = tx.allocationItemId != null;
+                        final ok = await confirmDelete(
+                          context,
+                          title: 'Delete transaction?',
+                          body: linked
+                              ? 'Allocation-linked transactions cannot be deleted.'
+                              : 'This cannot be undone. The record is removed from this device only.',
+                        );
+                        if (!ok || !context.mounted) return false;
+                        final success = await FinanceScope.of(context).run(
+                          () => app.deleteTransaction(tx.id),
+                        );
+                        if (context.mounted) {
+                          await showErasedConfirmation(
+                            context,
+                            title: success ? 'Erased' : 'Not deleted',
+                            body: success
+                                ? 'This transaction has been erased from FinZee on this device.'
+                                : (FinanceScope.of(context).error ?? 'Nothing was erased.'),
+                            success: success,
+                          );
+                        }
+                        return success;
+                      },
+                      onDismissed: (_) {},
                       child: InkWell(
                         onTap: () => showEditTransaction(context, tx),
                         child: FinzeeCard(

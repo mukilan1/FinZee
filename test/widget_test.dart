@@ -81,4 +81,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('valid amount'), findsWidgets);
   });
+
+  testWidgets('wipe all data shows a confirmation after erase', (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('More')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Delete all data'), 300, scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text('Delete all data'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete entire application data'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete all FinZee data?'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Type DELETE to confirm'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'DELETE');
+    await tester.tap(find.text('Wipe everything'));
+    await tester.pumpAndSettle();
+    expect(find.text('All application data erased'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+  });
 }

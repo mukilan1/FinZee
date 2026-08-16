@@ -138,13 +138,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
           actions: [
             if (existing != null)
               TextButton(
-                onPressed: () async {
-                  final sure = await confirmDelete(ctx, title: 'Delete goal?');
-                  if (sure && context.mounted) {
-                    await FinanceScope.of(context).run(() => app.deleteSavingsGoal(existing.id));
-                    if (ctx.mounted) Navigator.pop(ctx, false);
-                  }
-                },
+                onPressed: () => confirmEraseFromEditor(
+                  pageContext: context,
+                  dialogContext: ctx,
+                  title: 'Delete goal?',
+                  erase: () => FinanceScope.of(context).run(() => app.deleteSavingsGoal(existing.id)),
+                  failBody: () => FinanceScope.of(context).error,
+                ),
                 child: const Text('Delete'),
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
@@ -200,13 +200,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
           actions: [
             if (existing != null)
               TextButton(
-                onPressed: () async {
-                  final sure = await confirmDelete(ctx, title: 'Delete financial goal?');
-                  if (sure && context.mounted) {
-                    await FinanceScope.of(context).run(() => app.deleteFinancialGoal(existing.id));
-                    if (ctx.mounted) Navigator.pop(ctx, false);
-                  }
-                },
+                onPressed: () => confirmEraseFromEditor(
+                  pageContext: context,
+                  dialogContext: ctx,
+                  title: 'Delete financial goal?',
+                  erase: () => FinanceScope.of(context).run(() => app.deleteFinancialGoal(existing.id)),
+                  failBody: () => FinanceScope.of(context).error,
+                ),
                 child: const Text('Delete'),
               ),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),

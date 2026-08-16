@@ -12,3 +12,4 @@ android/.gradle/
 android/local.properties
 ios/Pods/
 windows/flutter/ephemeral/
+tool/node_modules/

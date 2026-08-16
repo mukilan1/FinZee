@@ -256,6 +256,22 @@ class _EditTransactionSheetState extends State<_EditTransactionSheet> {
               ),
             TextField(controller: note, decoration: const InputDecoration(labelText: 'Note')),
             const SizedBox(height: 16),
+            if (widget.tx.allocationItemId == null) ...[
+              OutlinedButton(
+                onPressed: () async {
+                  final success = await confirmAndErase(
+                    context,
+                    title: 'Delete transaction?',
+                    erase: () => ctrl.run(() => app.deleteTransaction(widget.tx.id)),
+                    failBody: () => ctrl.error,
+                    doneBody: 'This transaction has been erased from FinZee on this device.',
+                  );
+                  if (success && context.mounted) Navigator.pop(context);
+                },
+                child: const Text('Delete transaction'),
+              ),
+              const SizedBox(height: 8),
+            ],
             FilledButton(
               onPressed: () async {
                 final ok = await ctrl.run(() async {

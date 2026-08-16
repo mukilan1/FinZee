@@ -237,22 +237,24 @@ class SampleDataPage extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () async {
-                final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Replace current data?'),
-                    content: const Text(
+                final ok = await confirmDelete(
+                  context,
+                  title: 'Replace current data?',
+                  body:
                       'This clears the local database and loads the sample household. Export a backup first if you have real data.',
-                    ),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Load sample')),
-                    ],
-                  ),
+                  confirmLabel: 'Load sample',
                 );
-                if (ok == true && context.mounted) {
-                  await ctrl.run(() => ctrl.app.loadSampleData(reset: true));
-                }
+                if (ok != true || !context.mounted) return;
+                final loaded = await ctrl.run(() => ctrl.app.loadSampleData(reset: true));
+                if (!context.mounted) return;
+                await showErasedConfirmation(
+                  context,
+                  title: loaded ? 'Sample data loaded' : 'Could not load sample',
+                  body: loaded
+                      ? 'Previous records on this device were erased and replaced with the sample household.'
+                      : (ctrl.error ?? 'Nothing was changed.'),
+                  success: loaded,
+                );
               },
               child: const Text('Load sample household'),
             ),
@@ -322,24 +324,28 @@ class BackupPage extends StatelessWidget {
                 final safety = await app.backup.exportJson();
                 final summary = app.backup.summarize(incoming);
                 if (!context.mounted) return;
-                final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Restore backup?'),
-                    content: Text('Schema v${summary.schemaVersion}\nAccounts ${summary.accountCount}\nTransactions ${summary.transactionCount}\nA safety backup of current data will be taken first.'),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Restore')),
-                    ],
-                  ),
+                final ok = await confirmDelete(
+                  context,
+                  title: 'Restore backup?',
+                  body:
+                      'Schema v${summary.schemaVersion}\nAccounts ${summary.accountCount}\nTransactions ${summary.transactionCount}\nThis replaces current data. A safety backup of current data will be taken first.',
+                  confirmLabel: 'Restore',
                 );
-                if (ok == true && context.mounted) {
-                  final ctrl = FinanceScope.of(context);
-                  await ctrl.run(() async {
-                    await app.backup.restore(incoming, safetyBackup: safety);
-                    await app.reload();
-                  });
-                }
+                if (ok != true || !context.mounted) return;
+                final ctrl = FinanceScope.of(context);
+                final restored = await ctrl.run(() async {
+                  await app.backup.restore(incoming, safetyBackup: safety);
+                  await app.reload();
+                });
+                if (!context.mounted) return;
+                await showErasedConfirmation(
+                  context,
+                  title: restored ? 'Backup restored' : 'Restore failed',
+                  body: restored
+                      ? 'Previous data on this device was replaced with the backup. A safety copy was taken first.'
+                      : (ctrl.error ?? 'Nothing was changed.'),
+                  success: restored,
+                );
               },
               child: const Text('Restore backup'),
             ),

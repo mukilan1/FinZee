@@ -123,7 +123,16 @@ class _AlertTile extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Dismiss',
-            onPressed: () => ctrl.run(() => ctrl.app.dismissAlert(alert.id)),
+            onPressed: () => confirmAndErase(
+              context,
+              title: 'Dismiss this alert?',
+              body: 'The alert is hidden from the inbox. Financial records are not deleted.',
+              confirmLabel: 'Dismiss',
+              erase: () => ctrl.run(() => ctrl.app.dismissAlert(alert.id)),
+              doneTitle: 'Dismissed',
+              doneBody: 'This alert was removed from the inbox.',
+              failBody: () => ctrl.error,
+            ),
             icon: const Icon(Icons.close, size: 18),
           ),
         ],
