@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../domain/entities.dart';
 import '../../features/notifications/notifications_page.dart';
 import '../../features/transactions/add_sheet.dart';
+import 'app_drawer.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -16,7 +17,9 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = FinanceScope.of(context);
     final unread = ctrl.app.unreadAlertCount();
+    final palette = context.finzee;
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: const Text('FinZee'),
         actions: [
@@ -45,7 +48,7 @@ class AppShell extends StatelessWidget {
         children: [
           if (ctrl.error != null)
             Material(
-              color: FinzeeColors.expense,
+              color: palette.expense,
               child: SafeArea(
                 bottom: false,
                 child: ListTile(
@@ -63,15 +66,13 @@ class AppShell extends StatelessWidget {
       ),
       floatingActionButton: navigationShell.currentIndex <= 1
           ? FloatingActionButton(
-              backgroundColor: FinzeeColors.primaryDark,
+              backgroundColor: palette.primaryDark,
               onPressed: () => showAddSheet(context, TransactionType.expense),
-              child: const Icon(Icons.add, color: Colors.white),
+              child: Icon(Icons.add, color: palette.background),
             )
           : null,
       bottomNavigationBar: NavigationBar(
         height: 68,
-        backgroundColor: FinzeeColors.surface,
-        indicatorColor: FinzeeColors.primarySoft,
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: navigationShell.goBranch,
         destinations: const [
@@ -96,9 +97,9 @@ class AppShell extends StatelessWidget {
             label: 'Goals',
           ),
           NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: 'More',
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),

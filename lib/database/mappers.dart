@@ -41,6 +41,7 @@ FinanceTransaction mapTransaction(TransactionRow row) => FinanceTransaction(
       goalId: row.goalId,
       investmentId: row.investmentId,
       createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     );
 
 List<String> _decodeTags(String json) {
@@ -81,6 +82,7 @@ MonthlyPlan mapPlan(MonthlyPlanRow row) => MonthlyPlan(
       expectedIncome: Money(row.expectedIncomeMinor),
       confirmed: row.confirmed,
       createdAt: row.createdAt,
+      confirmedAt: row.confirmedAt,
     );
 
 AllocationItem mapAllocation(AllocationItemRow row) => AllocationItem(
@@ -103,6 +105,8 @@ AllocationItem mapAllocation(AllocationItemRow row) => AllocationItem(
           : SkipReason.values.byName(row.skipReason!),
       skipNote: row.skipNote,
       sortOrder: row.sortOrder,
+      createdAt: row.createdAt,
+      statusChangedAt: row.statusChangedAt,
     );
 
 AllocationTemplateItem mapTemplate(AllocationTemplateRow row) =>
@@ -132,6 +136,9 @@ SavingsGoal mapGoal(SavingsGoalRow row) => SavingsGoal(
       priority: row.priority,
       notes: row.notes,
       archived: row.archived,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      completedAt: row.completedAt,
     );
 
 Investment mapInvestment(InvestmentRow row) => Investment(
@@ -194,6 +201,9 @@ FinancialGoal mapFinancialGoal(FinancialGoalRow row) => FinancialGoal(
           : Money(row.requiredMonthlyMinor!),
       kind: row.kind,
       notes: row.notes,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      completedAt: row.completedAt,
     );
 
 FinanceNote mapNote(NoteRow row) => FinanceNote(

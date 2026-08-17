@@ -30,7 +30,7 @@ GoRouter createAppRouter() => GoRouter(
           GoRoute(path: '/goals', builder: (_, _) => const GoalsScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/more', builder: (_, _) => const MoreScreen()),
+          GoRoute(path: '/settings', builder: (_, _) => const MoreScreen()),
         ]),
       ],
     ),

@@ -78,6 +78,7 @@ class FinanceTransaction {
     this.goalId,
     this.investmentId,
     required this.createdAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -97,6 +98,7 @@ class FinanceTransaction {
   final String? goalId;
   final String? investmentId;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 }
 
 class IncomeSource {
@@ -176,6 +178,7 @@ class MonthlyPlan {
     required this.expectedIncome,
     this.confirmed = false,
     required this.createdAt,
+    this.confirmedAt,
   });
 
   final String id;
@@ -184,6 +187,7 @@ class MonthlyPlan {
   final Money expectedIncome;
   final bool confirmed;
   final DateTime createdAt;
+  final DateTime? confirmedAt;
 
   String get periodKey =>
       '$year-${month.toString().padLeft(2, '0')}';
@@ -207,6 +211,8 @@ class AllocationItem {
     this.skipReason,
     this.skipNote,
     this.sortOrder = 0,
+    this.createdAt,
+    this.statusChangedAt,
   });
 
   final String id;
@@ -225,6 +231,8 @@ class AllocationItem {
   final SkipReason? skipReason;
   final String? skipNote;
   final int sortOrder;
+  final DateTime? createdAt;
+  final DateTime? statusChangedAt;
 
   Money get remaining {
     final actual = actualAmount ?? const Money(0);
@@ -271,6 +279,9 @@ class SavingsGoal {
     this.priority = 1,
     this.notes,
     this.archived = false,
+    this.createdAt,
+    this.updatedAt,
+    this.completedAt,
   });
 
   final String id;
@@ -282,6 +293,9 @@ class SavingsGoal {
   final int priority;
   final String? notes;
   final bool archived;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final DateTime? completedAt;
 
   double get progress => targetAmount.minor == 0
       ? 0
@@ -396,6 +410,9 @@ class FinancialGoal {
     this.requiredMonthly,
     this.kind = 'general',
     this.notes,
+    this.createdAt,
+    this.updatedAt,
+    this.completedAt,
   });
 
   final String id;
@@ -406,6 +423,9 @@ class FinancialGoal {
   final Money? requiredMonthly;
   final String kind;
   final String? notes;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final DateTime? completedAt;
 
   double get progress => targetAmount.minor == 0
       ? 0

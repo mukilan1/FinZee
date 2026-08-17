@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../application/app_lock_service.dart';
+import '../app/theme.dart';
 import '../core/errors.dart';
 import '../core/features.dart';
 import '../core/ids.dart';
@@ -50,6 +51,8 @@ class FinanceApp {
   List<AllocationTemplateItem> templates = [];
   List<SalaryHistoryEntry> salaryHistory = [];
   List<AuditEvent> audits = [];
+  List<MonthlyPlan> allPlans = [];
+  ThemePreference themePreference = ThemePreference.system;
 
   bool enabled(AppFeature feature) => features[feature] ?? false;
 
@@ -80,12 +83,25 @@ class FinanceApp {
     notes = await repo.notes();
     templates = await repo.templates();
     audits = await repo.auditLog();
+    allPlans = await repo.allPlans();
     final now = DateTime.now();
     budgets = await repo.budgetsFor(now.year, now.month);
     plan = await repo.planFor(now.year, now.month);
     allocations = plan == null ? [] : await repo.allocationsFor(plan!.id);
     await _loadLock();
+    await _loadTheme();
     await _loadAlertState();
+  }
+
+  Future<void> _loadTheme() async {
+    final raw = await repo.setting('theme_mode');
+    themePreference = ThemePreference.fromStorage(raw);
+  }
+
+  Future<void> setThemePreference(ThemePreference preference) async {
+    await repo.setSetting('theme_mode', preference.storageValue);
+    themePreference = preference;
+    await repo.audit('SETTING_CHANGED', 'theme_mode=${preference.storageValue}');
   }
 
   DashboardSnapshot dashboard([DateTime? now]) {
@@ -329,11 +345,14 @@ class FinanceApp {
         'Device security is not available on this device.',
       );
     }
-    final ok = await lockService.authenticate(
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final result = await lockService.authenticate(
       reason: 'Confirm enabling app lock for FinZee',
     );
-    if (!ok) {
-      throw const AuthenticationError('Device authentication was cancelled.');
+    if (!result.success) {
+      throw AuthenticationError(
+        result.message ?? 'Device authentication was cancelled.',
+      );
     }
     await repo.setSetting('lock_enabled', '1');
     _lockEnabled = true;
@@ -344,11 +363,14 @@ class FinanceApp {
 
   Future<void> disableAppLock() async {
     if (_lockEnabled) {
-      final ok = await lockService.authenticate(
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final result = await lockService.authenticate(
         reason: 'Confirm disabling app lock for FinZee',
       );
-      if (!ok) {
-        throw const AuthenticationError('Device authentication was cancelled.');
+      if (!result.success) {
+        throw AuthenticationError(
+          result.message ?? 'Device authentication was cancelled.',
+        );
       }
     }
     await repo.setSetting('lock_enabled', '0');
@@ -359,19 +381,24 @@ class FinanceApp {
   }
 
   Future<bool> unlockApp() async {
-    final ok = await lockService.authenticate(
+    final result = await lockService.authenticate(
       reason: 'Unlock FinZee',
     );
-    if (ok) unlocked = true;
-    return ok;
+    if (result.success) unlocked = true;
+    return result.success;
+  }
+
+  String? lastAuthMessage;
+
+  Future<bool> authenticateSensitiveAction(String reason) async {
+    final result = await lockService.authenticate(reason: reason);
+    lastAuthMessage = result.message;
+    return result.success;
   }
 
   void lockApp() {
     if (_lockEnabled) unlocked = false;
   }
-
-  Future<bool> authenticateSensitiveAction(String reason) =>
-      lockService.authenticate(reason: reason);
 
   Future<void> upsertAccount(Account account) async {
     requireValidCurrency(account.currency);
@@ -446,8 +473,62 @@ class FinanceApp {
   }
 
   Future<void> upsertSavingsGoal(SavingsGoal goal) async {
-    await repo.upsertSavingsGoal(goal);
+    final existing = savingsGoals.where((g) => g.id == goal.id).toList();
+    final previous = existing.isEmpty ? null : existing.first;
+    final stamped = _stampSavingsGoal(previous, goal);
+    await repo.upsertSavingsGoal(stamped);
     await reload();
+  }
+
+  SavingsGoal _stampSavingsGoal(SavingsGoal? previous, SavingsGoal next) {
+    final now = DateTime.now();
+    final completed =
+        next.currentAmount.minor >= next.targetAmount.minor && next.targetAmount.minor > 0;
+    return SavingsGoal(
+      id: next.id,
+      name: next.name,
+      targetAmount: next.targetAmount,
+      currentAmount: next.currentAmount,
+      targetDate: next.targetDate,
+      monthlyContribution: next.monthlyContribution,
+      priority: next.priority,
+      notes: next.notes,
+      archived: next.archived,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+      completedAt: completed
+          ? (previous?.completedAt ?? now)
+          : previous?.completedAt,
+    );
+  }
+
+  Future<void> upsertFinancialGoal(FinancialGoal goal) async {
+    final existing = financialGoals.where((g) => g.id == goal.id).toList();
+    final previous = existing.isEmpty ? null : existing.first;
+    final stamped = _stampFinancialGoal(previous, goal);
+    await repo.upsertFinancialGoal(stamped);
+    await reload();
+  }
+
+  FinancialGoal _stampFinancialGoal(FinancialGoal? previous, FinancialGoal next) {
+    final now = DateTime.now();
+    final completed =
+        next.currentAmount.minor >= next.targetAmount.minor && next.targetAmount.minor > 0;
+    return FinancialGoal(
+      id: next.id,
+      name: next.name,
+      targetAmount: next.targetAmount,
+      currentAmount: next.currentAmount,
+      deadline: next.deadline,
+      requiredMonthly: next.requiredMonthly,
+      kind: next.kind,
+      notes: next.notes,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+      completedAt: completed
+          ? (previous?.completedAt ?? now)
+          : previous?.completedAt,
+    );
   }
 
   Future<void> upsertInvestment(Investment item) async {
@@ -467,11 +548,6 @@ class FinanceApp {
 
   Future<void> upsertLoan(Loan loan) async {
     await repo.upsertLoan(loan);
-    await reload();
-  }
-
-  Future<void> upsertFinancialGoal(FinancialGoal goal) async {
-    await repo.upsertFinancialGoal(goal);
     await reload();
   }
 
@@ -496,6 +572,43 @@ class FinanceApp {
       categories: categories,
       allocations: allocations,
     );
+  }
+
+  Future<MonthlyReport> monthlyReportFor(int year, int month) async {
+    final plan = await repo.planFor(year, month);
+    final monthAllocations =
+        plan == null ? <AllocationItem>[] : await repo.allocationsFor(plan.id);
+    return calc.monthlyReport(
+      range: MonthRange(year, month),
+      transactions: transactions,
+      categories: categories,
+      allocations: monthAllocations,
+    );
+  }
+
+  List<MonthRange> reportMonths({int limit = 24}) {
+    final keys = <String, MonthRange>{};
+    for (final tx in transactions) {
+      final range = MonthRange(tx.date.year, tx.date.month);
+      keys['${range.year}-${range.month}'] = range;
+    }
+    for (final p in allPlans) {
+      keys['${p.year}-${p.month}'] = MonthRange(p.year, p.month);
+    }
+    final sorted = keys.values.toList()
+      ..sort((a, b) {
+        final da = DateTime(a.year, a.month);
+        final db = DateTime(b.year, b.month);
+        return db.compareTo(da);
+      });
+    if (sorted.length <= limit) return sorted;
+    return sorted.sublist(0, limit);
+  }
+
+  List<FinanceTransaction> transactionsForMonth(int year, int month) {
+    final range = MonthRange(year, month);
+    return transactions.where((t) => range.contains(t.date)).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
   }
 
   YearlyReport yearlyReport([DateTime? now]) {
@@ -558,7 +671,28 @@ class FinanceApp {
         );
       }
     }
-    await repo.upsertTransaction(next);
+    await repo.upsertTransaction(
+      FinanceTransaction(
+        id: next.id,
+        type: next.type,
+        amount: next.amount,
+        date: next.date,
+        accountId: next.accountId,
+        toAccountId: next.toAccountId,
+        categoryId: next.categoryId,
+        subcategoryId: next.subcategoryId,
+        paymentMethod: next.paymentMethod,
+        incomeSourceId: next.incomeSourceId,
+        note: next.note,
+        tags: next.tags,
+        attachmentPath: next.attachmentPath,
+        allocationItemId: next.allocationItemId,
+        goalId: next.goalId,
+        investmentId: next.investmentId,
+        createdAt: next.createdAt,
+        updatedAt: DateTime.now(),
+      ),
+    );
     await repo.audit('TRANSACTION_UPDATED', next.id);
     await reload();
   }
@@ -620,6 +754,7 @@ class FinanceApp {
         expectedIncome: expectedIncome,
         confirmed: plan!.confirmed,
         createdAt: createdAt ?? plan!.createdAt,
+        confirmedAt: plan!.confirmedAt,
       ),
     );
     await repo.audit('PLAN_UPDATED', plan!.id);
@@ -647,6 +782,7 @@ class FinanceApp {
         goalId: goalId,
         investmentId: investmentId,
         sortOrder: allocations.length,
+        createdAt: DateTime.now(),
       ),
     );
     await repo.audit('ALLOCATION_CREATED', name);

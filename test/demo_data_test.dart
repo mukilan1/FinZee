@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:finzee/application/app_lock_service.dart';
+import 'package:finzee/application/auth_result.dart';
 import 'package:finzee/application/demo_data.dart';
 import 'package:finzee/application/finance_app.dart';
 import 'package:finzee/core/errors.dart';
@@ -198,7 +199,8 @@ void main() {
     final lockedApp = FinanceApp(
       FinanceRepository(db),
       lockService: AppLockService(
-        authenticateOverride: (reason) async => !reason.contains('Unlock'),
+        authenticateOverride: (reason) async =>
+            reason.contains('Unlock') ? AuthResult.cancelled() : AuthResult.ok,
         deviceSupportedOverride: () async => true,
       ),
     );

@@ -28,7 +28,7 @@ class _PlanScreenState extends State<PlanScreen> {
     if (!app.enabled(AppFeature.salaryPlanning)) {
       return const EmptyState(
         title: 'Salary planning is off',
-        subtitle: 'Enable Salary Planning in More → Features. Your data stays safe.',
+        subtitle: 'Enable Salary Planning in Settings → Features. Your data stays safe.',
       );
     }
     final planned = app.allocations.fold(const Money(0), (p, a) => p + a.plannedAmount);
@@ -61,9 +61,14 @@ class _PlanScreenState extends State<PlanScreen> {
               Text('Planned ${planned.format()}'),
               Text('Unallocated ${unallocated.format()}'),
               if (app.plan?.confirmed == true)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text('Confirmed', style: TextStyle(color: FinzeeColors.income)),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    app.plan?.confirmedAt != null
+                        ? 'Confirmed ${formatRecordTimestamp(app.plan!.confirmedAt)}'
+                        : 'Confirmed',
+                    style: TextStyle(color: context.finzee.income),
+                  ),
                 ),
               TextButton(
                 onPressed: app.plan == null ? null : () => _editExpected(context),
@@ -225,7 +230,12 @@ class _AllocationTile extends StatelessWidget {
           ),
           Text('${item.plannedAmount.format()} planned · ${item.kind.name}'),
           if (item.actualAmount != null) Text('${item.actualAmount!.format()} actual'),
-          if (item.skipNote != null) Text(item.skipNote!, style: const TextStyle(color: FinzeeColors.textSecondary)),
+          if (item.statusChangedAt != null)
+            Text(
+              '${item.status.name} ${formatRecordTimestamp(item.statusChangedAt)}',
+              style: TextStyle(color: context.finzee.textSecondary, fontSize: 12),
+            ),
+          if (item.skipNote != null) Text(item.skipNote!, style: TextStyle(color: context.finzee.textSecondary)),
           Wrap(
             spacing: 8,
             children: [

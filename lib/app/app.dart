@@ -32,9 +32,7 @@ class _FinzeeAppState extends State<FinzeeApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
       if (widget.controller.app.lockEnabled) {
         widget.controller.lockApp();
       }
@@ -48,10 +46,13 @@ class _FinzeeAppState extends State<FinzeeApp> with WidgetsBindingObserver {
       child: ListenableBuilder(
         listenable: widget.controller,
         builder: (context, _) {
+          final themeMode = widget.controller.app.themePreference.themeMode;
           return MaterialApp.router(
             title: 'FinZee',
             debugShowCheckedModeBanner: false,
-            theme: buildFinzeeTheme(),
+            theme: buildFinzeeLightTheme(),
+            darkTheme: buildFinzeeDarkTheme(),
+            themeMode: themeMode,
             routerConfig: _router,
             builder: (context, child) {
               final locked =
@@ -81,12 +82,6 @@ class _LockGateState extends State<_LockGate> {
   bool _busy = false;
   String? _message;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _unlock());
-  }
-
   Future<void> _unlock() async {
     if (_busy) return;
     setState(() {
@@ -94,29 +89,30 @@ class _LockGateState extends State<_LockGate> {
       _message = null;
     });
     final ctrl = FinanceScope.of(context);
-    final ok = await ctrl.app.unlockApp();
+    final ok = await ctrl.unlockApp();
     if (!mounted) return;
     if (ok) {
-      ctrl.notifyListeners();
       return;
     }
     setState(() {
       _busy = false;
-      _message = 'Unlock cancelled. Use your phone\'s fingerprint, face, or screen lock.';
+      _message = ctrl.app.lastAuthMessage ??
+          'Unlock cancelled. Use your phone\'s fingerprint, face, or screen lock.';
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.finzee;
     return Material(
-      color: FinzeeColors.background,
+      color: palette.background,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.fingerprint, size: 48, color: FinzeeColors.primaryDark),
+              Icon(Icons.fingerprint, size: 48, color: palette.primaryDark),
               const SizedBox(height: 16),
               Text('FinZee is locked', style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
@@ -128,7 +124,7 @@ class _LockGateState extends State<_LockGate> {
                 const SizedBox(height: 12),
                 Text(
                   _message!,
-                  style: const TextStyle(color: FinzeeColors.expense),
+                  style: TextStyle(color: palette.expense),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -136,10 +132,13 @@ class _LockGateState extends State<_LockGate> {
               FilledButton.icon(
                 onPressed: _busy ? null : _unlock,
                 icon: _busy
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: palette.background,
+                        ),
                       )
                     : const Icon(Icons.lock_open),
                 label: Text(_busy ? 'Waiting for device unlock…' : 'Unlock FinZee'),

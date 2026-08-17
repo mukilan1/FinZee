@@ -93,6 +93,7 @@ class BackupService {
                 'goalId': t.goalId,
                 'investmentId': t.investmentId,
                 'createdAt': t.createdAt.toIso8601String(),
+                if (t.updatedAt != null) 'updatedAt': t.updatedAt!.toIso8601String(),
               })
           .toList(),
       'salary': salary == null
@@ -136,6 +137,8 @@ class BackupService {
               'expectedIncomeMinor': plan.expectedIncome.minor,
               'confirmed': plan.confirmed,
               'createdAt': plan.createdAt.toIso8601String(),
+              if (plan.confirmedAt != null)
+                'confirmedAt': plan.confirmedAt!.toIso8601String(),
             },
       'allocations': allocations
           .map((a) => {
@@ -152,6 +155,9 @@ class BackupService {
                 'sortOrder': a.sortOrder,
                 'accountId': a.accountId,
                 'categoryId': a.categoryId,
+                if (a.createdAt != null) 'createdAt': a.createdAt!.toIso8601String(),
+                if (a.statusChangedAt != null)
+                  'statusChangedAt': a.statusChangedAt!.toIso8601String(),
               })
           .toList(),
       'savingsGoals': goals
@@ -162,6 +168,9 @@ class BackupService {
                 'currentAmountMinor': g.currentAmount.minor,
                 'monthlyContributionMinor': g.monthlyContribution?.minor,
                 'priority': g.priority,
+                if (g.createdAt != null) 'createdAt': g.createdAt!.toIso8601String(),
+                if (g.updatedAt != null) 'updatedAt': g.updatedAt!.toIso8601String(),
+                if (g.completedAt != null) 'completedAt': g.completedAt!.toIso8601String(),
               })
           .toList(),
       'investments': investments
@@ -202,6 +211,9 @@ class BackupService {
                 'targetAmountMinor': g.targetAmount.minor,
                 'currentAmountMinor': g.currentAmount.minor,
                 'kind': g.kind,
+                if (g.createdAt != null) 'createdAt': g.createdAt!.toIso8601String(),
+                if (g.updatedAt != null) 'updatedAt': g.updatedAt!.toIso8601String(),
+                if (g.completedAt != null) 'completedAt': g.completedAt!.toIso8601String(),
               })
           .toList(),
       'notes': notes
@@ -353,6 +365,9 @@ class BackupService {
           expectedIncome: Money(p['expectedIncomeMinor'] as int),
           confirmed: p['confirmed'] as bool? ?? false,
           createdAt: DateTime.parse(p['createdAt'] as String),
+          confirmedAt: p['confirmedAt'] == null
+              ? null
+              : DateTime.parse(p['confirmedAt'] as String),
         ),
       );
     }
@@ -377,6 +392,12 @@ class BackupService {
           sortOrder: a['sortOrder'] as int? ?? 0,
           accountId: a['accountId'] as String?,
           categoryId: a['categoryId'] as String?,
+          createdAt: a['createdAt'] == null
+              ? null
+              : DateTime.parse(a['createdAt'] as String),
+          statusChangedAt: a['statusChangedAt'] == null
+              ? null
+              : DateTime.parse(a['statusChangedAt'] as String),
         ),
       );
     }
@@ -392,6 +413,15 @@ class BackupService {
               ? null
               : Money(g['monthlyContributionMinor'] as int),
           priority: g['priority'] as int? ?? 1,
+          createdAt: g['createdAt'] == null
+              ? null
+              : DateTime.parse(g['createdAt'] as String),
+          updatedAt: g['updatedAt'] == null
+              ? null
+              : DateTime.parse(g['updatedAt'] as String),
+          completedAt: g['completedAt'] == null
+              ? null
+              : DateTime.parse(g['completedAt'] as String),
         ),
       );
     }
@@ -446,6 +476,15 @@ class BackupService {
           targetAmount: Money(g['targetAmountMinor'] as int),
           currentAmount: Money(g['currentAmountMinor'] as int? ?? 0),
           kind: g['kind'] as String? ?? 'general',
+          createdAt: g['createdAt'] == null
+              ? null
+              : DateTime.parse(g['createdAt'] as String),
+          updatedAt: g['updatedAt'] == null
+              ? null
+              : DateTime.parse(g['updatedAt'] as String),
+          completedAt: g['completedAt'] == null
+              ? null
+              : DateTime.parse(g['completedAt'] as String),
         ),
       );
     }
@@ -476,6 +515,9 @@ class BackupService {
           goalId: t['goalId'] as String?,
           investmentId: t['investmentId'] as String?,
           createdAt: DateTime.parse(t['createdAt'] as String),
+          updatedAt: t['updatedAt'] == null
+              ? null
+              : DateTime.parse(t['updatedAt'] as String),
         ),
       );
     }

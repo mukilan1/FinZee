@@ -45,12 +45,26 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
           await m.createAll();
+        },
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(monthlyPlans, monthlyPlans.confirmedAt);
+            await m.addColumn(allocationItems, allocationItems.createdAt);
+            await m.addColumn(allocationItems, allocationItems.statusChangedAt);
+            await m.addColumn(transactions, transactions.updatedAt);
+            await m.addColumn(savingsGoals, savingsGoals.createdAt);
+            await m.addColumn(savingsGoals, savingsGoals.updatedAt);
+            await m.addColumn(savingsGoals, savingsGoals.completedAt);
+            await m.addColumn(financialGoals, financialGoals.createdAt);
+            await m.addColumn(financialGoals, financialGoals.updatedAt);
+            await m.addColumn(financialGoals, financialGoals.completedAt);
+          }
         },
       );
 }

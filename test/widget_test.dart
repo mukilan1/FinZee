@@ -34,7 +34,7 @@ void main() {
     expect(find.text('How am I doing this month?'), findsOneWidget);
   });
 
-  testWidgets('bottom navigation reaches transactions, plan, goals, more', (tester) async {
+  testWidgets('bottom navigation reaches transactions, plan, goals, settings', (tester) async {
     await pumpApp(tester);
     await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Transactions')));
     await tester.pumpAndSettle();
@@ -45,7 +45,7 @@ void main() {
     await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Goals')));
     await tester.pumpAndSettle();
     expect(find.text('Goals'), findsWidgets);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('More')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Settings')));
     await tester.pumpAndSettle();
     expect(find.text('Backup & restore'), findsOneWidget);
     expect(find.text('Features'), findsOneWidget);
@@ -54,7 +54,7 @@ void main() {
 
   testWidgets('accounts page shows add account actions', (tester) async {
     await pumpApp(tester);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('More')));
+    await tester.tap(find.byIcon(Icons.menu));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Accounts'));
     await tester.pumpAndSettle();
@@ -84,7 +84,7 @@ void main() {
 
   testWidgets('wipe all data shows a confirmation after erase', (tester) async {
     await pumpApp(tester);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('More')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Settings')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Delete all data'), 300, scrollable: find.byType(Scrollable).last);
     await tester.tap(find.text('Delete all data'));

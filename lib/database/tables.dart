@@ -48,6 +48,7 @@ class Transactions extends Table {
   TextColumn get goalId => text().nullable()();
   TextColumn get investmentId => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -99,6 +100,7 @@ class MonthlyPlans extends Table {
   IntColumn get expectedIncomeMinor => integer()();
   BoolColumn get confirmed => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get confirmedAt => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -122,6 +124,8 @@ class AllocationItems extends Table {
   TextColumn get skipReason => text().nullable()();
   TextColumn get skipNote => text().nullable()();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  DateTimeColumn get statusChangedAt => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -156,6 +160,9 @@ class SavingsGoals extends Table {
   IntColumn get priority => integer().withDefault(const Constant(1))();
   TextColumn get notes => text().nullable()();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get completedAt => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -235,6 +242,9 @@ class FinancialGoals extends Table {
   IntColumn get requiredMonthlyMinor => integer().nullable()();
   TextColumn get kind => text().withDefault(const Constant('general'))();
   TextColumn get notes => text().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get completedAt => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
