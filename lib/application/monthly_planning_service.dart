@@ -83,6 +83,7 @@ class MonthlyPlanningService {
     }
 
     var order = 0;
+    final now = DateTime.now();
     for (final t in templates) {
       await repo.upsertAllocation(
         AllocationItem(
@@ -98,6 +99,7 @@ class MonthlyPlanningService {
           loanId: t.loanId,
           accountId: t.accountId,
           sortOrder: order++,
+          createdAt: now,
         ),
       );
     }
@@ -139,6 +141,7 @@ class MonthlyPlanningService {
         expectedIncome: plan.expectedIncome,
         confirmed: true,
         createdAt: plan.createdAt,
+        confirmedAt: DateTime.now(),
       ),
     );
     await repo.audit('PLAN_CONFIRMED', planId);
@@ -179,16 +182,21 @@ class MonthlyPlanningService {
           if (goal == null) {
             throw const ValidationError('Allocation cannot reference a missing goal.');
           }
+          final updatedAmount = goal.currentAmount + actual;
           await repo.upsertSavingsGoal(
-            SavingsGoal(
-              id: goal.id,
-              name: goal.name,
-              targetAmount: goal.targetAmount,
-              currentAmount: goal.currentAmount + actual,
-              targetDate: goal.targetDate,
-              monthlyContribution: goal.monthlyContribution,
-              priority: goal.priority,
-              notes: goal.notes,
+            _goalWithTimestamps(
+              goal,
+              SavingsGoal(
+                id: goal.id,
+                name: goal.name,
+                targetAmount: goal.targetAmount,
+                currentAmount: updatedAmount,
+                targetDate: goal.targetDate,
+                monthlyContribution: goal.monthlyContribution,
+                priority: goal.priority,
+                notes: goal.notes,
+                archived: goal.archived,
+              ),
             ),
           );
           await repo.audit('GOAL_UPDATED', goal.id);
@@ -270,6 +278,7 @@ class MonthlyPlanningService {
       createdAt: DateTime.now(),
     );
     await repo.insertTransaction(tx);
+    final closedAt = DateTime.now();
     await repo.upsertAllocation(
       AllocationItem(
         id: item.id,
@@ -288,6 +297,8 @@ class MonthlyPlanningService {
         skipReason: item.skipReason,
         skipNote: item.skipNote,
         sortOrder: item.sortOrder,
+        createdAt: item.createdAt ?? closedAt,
+        statusChangedAt: closedAt,
       ),
     );
     await repo.audit(
@@ -311,6 +322,7 @@ class MonthlyPlanningService {
     }
     final item = await repo.allocationById(allocationId);
     if (item == null) throw const ValidationError('Allocation not found.');
+    final closedAt = DateTime.now();
     await repo.upsertAllocation(
       AllocationItem(
         id: item.id,
@@ -329,6 +341,8 @@ class MonthlyPlanningService {
         skipReason: reason,
         skipNote: note,
         sortOrder: item.sortOrder,
+        createdAt: item.createdAt ?? closedAt,
+        statusChangedAt: closedAt,
       ),
     );
     await repo.audit('ALLOCATION_SKIPPED', '$allocationId:${reason.name}');
@@ -342,5 +356,25 @@ class MonthlyPlanningService {
         ),
       );
     }
+  }
+
+  SavingsGoal _goalWithTimestamps(SavingsGoal previous, SavingsGoal next) {
+    final now = DateTime.now();
+    final completed =
+        next.currentAmount.minor >= next.targetAmount.minor && next.targetAmount.minor > 0;
+    return SavingsGoal(
+      id: next.id,
+      name: next.name,
+      targetAmount: next.targetAmount,
+      currentAmount: next.currentAmount,
+      targetDate: next.targetDate,
+      monthlyContribution: next.monthlyContribution,
+      priority: next.priority,
+      notes: next.notes,
+      archived: next.archived,
+      createdAt: previous.createdAt ?? now,
+      updatedAt: now,
+      completedAt: completed ? (previous.completedAt ?? now) : previous.completedAt,
+    );
   }
 }

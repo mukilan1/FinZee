@@ -46,6 +46,12 @@ class FinanceController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> unlockApp() async {
+    final ok = await app.unlockApp();
+    notifyListeners();
+    return ok;
+  }
+
   String _friendly(Object e) {
     final text = e.toString();
     final idx = text.indexOf(': ');

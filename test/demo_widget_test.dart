@@ -47,7 +47,7 @@ void main() {
     expect(find.text('Emergency Fund'), findsWidgets);
 
     await tester.tap(
-      find.descendant(of: find.byType(NavigationBar), matching: find.text('More')),
+      find.descendant(of: find.byType(NavigationBar), matching: find.text('Settings')),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

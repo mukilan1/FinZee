@@ -237,6 +237,7 @@ class FinanceRepository {
             goalId: Value(tx.goalId),
             investmentId: Value(tx.investmentId),
             createdAt: tx.createdAt,
+            updatedAt: Value(tx.updatedAt),
           ),
         );
   }
@@ -265,6 +266,7 @@ class FinanceRepository {
             goalId: Value(tx.goalId),
             investmentId: Value(tx.investmentId),
             createdAt: tx.createdAt,
+            updatedAt: Value(tx.updatedAt),
           ),
         );
   }
@@ -406,6 +408,16 @@ class FinanceRepository {
     return row == null ? null : mapPlan(row);
   }
 
+  Future<List<MonthlyPlan>> allPlans() async {
+    final rows = await (db.select(db.monthlyPlans)
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.year),
+            (t) => OrderingTerm.desc(t.month),
+          ]))
+        .get();
+    return rows.map(mapPlan).toList();
+  }
+
   Future<MonthlyPlan?> planById(String id) async {
     final row = await (db.select(db.monthlyPlans)..where((t) => t.id.equals(id)))
         .getSingleOrNull();
@@ -421,6 +433,7 @@ class FinanceRepository {
             expectedIncomeMinor: plan.expectedIncome.minor,
             confirmed: Value(plan.confirmed),
             createdAt: plan.createdAt,
+            confirmedAt: Value(plan.confirmedAt),
           ),
         );
   }
@@ -459,6 +472,8 @@ class FinanceRepository {
             skipReason: Value(item.skipReason?.name),
             skipNote: Value(item.skipNote),
             sortOrder: Value(item.sortOrder),
+            createdAt: Value(item.createdAt),
+            statusChangedAt: Value(item.statusChangedAt),
           ),
         );
   }
@@ -489,6 +504,9 @@ class FinanceRepository {
             priority: Value(goal.priority),
             notes: Value(goal.notes),
             archived: Value(goal.archived),
+            createdAt: Value(goal.createdAt),
+            updatedAt: Value(goal.updatedAt),
+            completedAt: Value(goal.completedAt),
           ),
         );
   }
@@ -599,6 +617,9 @@ class FinanceRepository {
             requiredMonthlyMinor: Value(goal.requiredMonthly?.minor),
             kind: Value(goal.kind),
             notes: Value(goal.notes),
+            createdAt: Value(goal.createdAt),
+            updatedAt: Value(goal.updatedAt),
+            completedAt: Value(goal.completedAt),
           ),
         );
   }

@@ -20,28 +20,49 @@ class MoreScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return const SettingsScreen();
+  }
+}
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text('More', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 12),
-          _tile(context, Icons.account_balance_wallet_outlined, 'Accounts', const AccountsPage()),
-          _tile(context, Icons.category_outlined, 'Categories', const CategoriesPage()),
-          _tile(context, Icons.payments_outlined, 'Salary & income', const SalaryPage()),
-          _tile(context, Icons.pie_chart_outline, 'Budgets', const BudgetsPage()),
-          _tile(context, Icons.show_chart, 'Investments', const InvestmentsPage()),
-          _tile(context, Icons.receipt_long_outlined, 'Bills', const BillsPage()),
-          _tile(context, Icons.account_balance_outlined, 'Loans', const LoansPage()),
-          _tile(context, Icons.insights_outlined, 'Reports', const ReportsPage()),
-          _tile(context, Icons.notes_outlined, 'Notes', const NotesPage()),
-          _tile(context, Icons.science_outlined, 'Sample data', const SampleDataPage()),
-          _tile(context, Icons.toggle_on_outlined, 'Features', const FeaturesPage()),
-          _tile(context, Icons.backup_outlined, 'Backup & restore', const BackupPage()),
+          Text('Settings', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 16),
+          _sectionTitle(context, 'Appearance & security'),
+          _tile(context, Icons.brightness_6_outlined, 'Theme', const AppearancePage()),
           _tile(context, Icons.lock_outline, 'Security', const SecurityPage()),
+          const SizedBox(height: 16),
+          _sectionTitle(context, 'Data & backup'),
+          _tile(context, Icons.backup_outlined, 'Backup & restore', const BackupPage()),
+          _tile(context, Icons.science_outlined, 'Sample data', const SampleDataPage()),
           _tile(context, Icons.delete_forever_outlined, 'Delete all data', const DangerZonePage()),
+          const SizedBox(height: 16),
+          _sectionTitle(context, 'App'),
+          _tile(context, Icons.toggle_on_outlined, 'Features', const FeaturesPage()),
           _tile(context, Icons.info_outline, 'About', const AboutPage()),
         ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: context.finzee.textSecondary,
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+          letterSpacing: 0.4,
+        ),
       ),
     );
   }
@@ -50,12 +71,44 @@ class MoreScreen extends StatelessWidget {
     return FinzeeCard(
       padding: EdgeInsets.zero,
       child: ListTile(
-        leading: Icon(icon, color: FinzeeColors.primaryDark),
+        leading: Icon(icon, color: context.finzee.primaryDark),
         title: Text(title),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute(builder: (_) => page),
         ),
+      ),
+    );
+  }
+}
+
+class AppearancePage extends StatelessWidget {
+  const AppearancePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = FinanceScope.of(context);
+    final current = ctrl.app.themePreference;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Theme')),
+      body: ListView(
+        children: ThemePreference.values
+            .map(
+              (mode) => RadioListTile<ThemePreference>(
+                title: Text(mode.label),
+                value: mode,
+                groupValue: current,
+                onChanged: (value) async {
+                  if (value == null) return;
+                  final ok = await ctrl.run(() => ctrl.app.setThemePreference(value));
+                  if (!context.mounted) return;
+                  if (ok) {
+                    showFinzeeSnackBar(context, 'Theme set to ${value.label}.');
+                  }
+                },
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -147,76 +200,10 @@ class _SalaryPageState extends State<SalaryPage> {
           ...app.salaryHistory.map(
             (h) => ListTile(
               title: Text('${h.previousAmount.format()} → ${h.newAmount.format()}'),
-              subtitle: Text('${h.reason ?? ''} · ${h.percentChange.toStringAsFixed(1)}%'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class ReportsPage extends StatefulWidget {
-  const ReportsPage({super.key});
-  @override
-  State<ReportsPage> createState() => _ReportsPageState();
-}
-
-class _ReportsPageState extends State<ReportsPage> {
-  late DateTime month = DateTime.now();
-
-  @override
-  Widget build(BuildContext context) {
-    final app = FinanceScope.of(context).app;
-    final report = app.monthlyReport(month);
-    final year = app.yearlyReport(month);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Reports')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TimelineTile(
-            label: 'Report month',
-            date: DateTime(month.year, month.month, 1),
-            onPick: () async {
-              final d = await pickTimeline(context, initial: month);
-              if (d != null) setState(() => month = d);
-            },
-          ),
-          FinzeeCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Monthly ${report.range.year}-${report.range.month}'),
-                Text('Income ${report.income.format()}'),
-                Text('Expenses ${report.expenses.format()}'),
-                Text('Savings ${report.savings.format()}'),
-                Text('Investments ${report.investments.format()}'),
-                Text('Remaining ${report.remaining.format()}'),
-                Text('Allocation success ${(report.allocationSuccessRate * 100).round()}%'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text('Planned vs actual', style: TextStyle(fontWeight: FontWeight.w600)),
-          ...report.plannedVsActual.map(
-            (r) => ListTile(
-              title: Text(r.name),
-              subtitle: Text('${r.planned.format()} → ${r.actual.format()}'),
-              trailing: Text(r.variance.format()),
-            ),
-          ),
-          const SizedBox(height: 12),
-          FinzeeCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Year ${year.year}'),
-                Text('Income ${year.income.format()}'),
-                Text('Spending ${year.expenses.format()}'),
-                Text('Savings rate ${(year.savingsRate * 100).toStringAsFixed(1)}%'),
-                Text('Net worth ${year.netWorth.format()}'),
-              ],
+              subtitle: Text(
+                '${h.reason ?? ''} · ${h.percentChange.toStringAsFixed(1)}% · '
+                '${formatRecordTimestamp(h.effectiveDate)}',
+              ),
             ),
           ),
         ],
@@ -335,7 +322,6 @@ class BackupPage extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () async {
-                final ctrl = FinanceScope.of(context);
                 final json = await app.backup.exportJson();
                 final saved = await FilePicker.platform.saveFile(
                   dialogTitle: 'Save FinZee backup',
@@ -434,9 +420,9 @@ class _SecurityPageState extends State<SecurityPage> {
             ),
             if (available == false) ...[
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Device security is not available here. Use a phone or tablet with a screen lock enabled.',
-                style: TextStyle(color: FinzeeColors.expense),
+                style: TextStyle(color: context.finzee.expense),
               ),
             ],
             const SizedBox(height: 16),
@@ -481,7 +467,7 @@ class AboutPage extends StatelessWidget {
       body: const Padding(
         padding: EdgeInsets.all(16),
         child: Text(
-          'FinZee is a 100% offline personal finance manager.\n\nNo registration, no cloud, no ads, no analytics, no bank APIs.\n\nMode A: track income, expenses, accounts, and reports.\nMode B: enable salary planning for allocations, checklists, planned vs actual, and exceptions.',
+          'FinZee is a 100% offline personal finance manager.\n\nNo registration, no cloud, no ads, no analytics, no bank APIs.\n\nMode A: track income, expenses, accounts, and reports.\nMode B: enable salary planning for allocations, checklists, planned vs actual, and exceptions.\n\nUse the menu icon for finance modules. Settings holds app and data options.',
         ),
       ),
     );

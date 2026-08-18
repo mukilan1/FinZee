@@ -12,10 +12,10 @@ class FinzeeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: color ?? FinzeeColors.surface,
+      color: color ?? context.finzee.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: FinzeeColors.border.withValues(alpha: 0.6)),
+        side: BorderSide(color: context.finzee.border.withValues(alpha: 0.6)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -74,14 +74,14 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.inbox_outlined, size: 40, color: FinzeeColors.textSecondary),
+            const Icon(Icons.inbox_outlined, size: 40),
             const SizedBox(height: 12),
             Text(title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 6),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: FinzeeColors.textSecondary),
+              style: TextStyle(color: context.finzee.textSecondary),
             ),
           ],
         ),

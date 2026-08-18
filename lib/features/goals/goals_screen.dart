@@ -60,7 +60,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
           const Text('Savings goals', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           if (savings.isEmpty)
-            const Text('No savings goals yet.', style: TextStyle(color: FinzeeColors.textSecondary)),
+            Text('No savings goals yet.', style: TextStyle(color: context.finzee.textSecondary)),
           ...savings.map((g) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: FinzeeCard(
@@ -73,12 +73,18 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         Text('${g.currentAmount.format()} / ${g.targetAmount.format()}'),
                         if (g.targetDate != null)
                           Text('Target ${g.targetDate!.day}/${g.targetDate!.month}/${g.targetDate!.year}',
-                              style: const TextStyle(color: FinzeeColors.textSecondary, fontSize: 12)),
+                              style: TextStyle(color: context.finzee.textSecondary, fontSize: 12)),
+                        if (g.updatedAt != null)
+                          Text('Updated ${formatRecordTimestamp(g.updatedAt)}',
+                              style: TextStyle(color: context.finzee.textSecondary, fontSize: 12)),
+                        if (g.completedAt != null)
+                          Text('Completed ${formatRecordTimestamp(g.completedAt)}',
+                              style: TextStyle(color: context.finzee.income, fontSize: 12)),
                         const SizedBox(height: 8),
                         LinearProgressIndicator(
                           value: g.progress,
-                          color: FinzeeColors.savings,
-                          backgroundColor: FinzeeColors.primarySoft,
+                          color: context.finzee.savings,
+                          backgroundColor: context.finzee.primarySoft,
                         ),
                       ],
                     ),
@@ -97,7 +103,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
           ...financial.map((g) => ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(g.name),
-                subtitle: Text('${g.currentAmount.format()} / ${g.targetAmount.format()} · ${g.onTrack ? 'On track' : 'Behind'}'),
+                subtitle: Text(
+                  '${g.currentAmount.format()} / ${g.targetAmount.format()} · ${g.onTrack ? 'On track' : 'Behind'}'
+                  '${g.completedAt != null ? ' · Done ${formatRecordTimestamp(g.completedAt)}' : ''}',
+                ),
                 onTap: () => _editFinancial(context, g),
               )),
         ],
