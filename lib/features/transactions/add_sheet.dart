@@ -4,22 +4,15 @@ import '../../app/finance_scope.dart';
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
-import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/feedback.dart';
+import '../../shared/widgets/finzee_ui.dart';
+import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 
 Future<void> showAddSheet(BuildContext context, TransactionType type) async {
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: FinzeeColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (ctx) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      child: AddTransactionSheet(initialType: type),
-    ),
+  await showFinzeeBottomSheet<void>(
+    context,
+    child: AddTransactionSheet(initialType: type),
   );
 }
 
@@ -66,40 +59,41 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   Widget build(BuildContext context) {
     final ctrl = FinanceScope.of(context);
     final app = ctrl.app;
+    final palette = context.finzee;
     if (app.accounts.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: Text('Create an account first in More → Accounts.'),
+      return Padding(
+        padding: const EdgeInsets.all(FinzeeSpacing.xl),
+        child: Text(
+          'Create an account first. Open the menu → Accounts.',
+          style: TextStyle(color: palette.textSecondary),
+        ),
       );
     }
     final expenseCats = app.categories.where((c) => c.kind == CategoryKind.expense).toList();
     final incomeCats = app.categories.where((c) => c.kind == CategoryKind.income).toList();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, FinzeeSpacing.xl),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Add ${type.name}', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: TransactionType.values
-                  .map(
-                    (t) => ChoiceChip(
-                      label: Text(t.name),
-                      selected: type == t,
-                      onSelected: (_) => setState(() => type = t),
-                    ),
-                  )
-                  .toList(),
+            FinzeeSheetHeader(
+              title: 'Add transaction',
+              subtitle: 'Choose a type and fill in the details below.',
             ),
-            const SizedBox(height: 12),
+            SegmentedButton<TransactionType>(
+              segments: TransactionType.values
+                  .map((t) => ButtonSegment(value: t, label: Text(t.name)))
+                  .toList(),
+              selected: {type},
+              onSelectionChanged: (s) => setState(() => type = s.first),
+            ),
+            const SizedBox(height: FinzeeSpacing.lg),
             AmountField(controller: amount),
-            const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: accountId,
+            const SizedBox(height: FinzeeSpacing.md),
+            DropdownButtonFormField<String>(
+              initialValue: accountId,
               decoration: const InputDecoration(labelText: 'Account'),
               items: app.accounts
                   .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
@@ -107,7 +101,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               onChanged: (v) => setState(() => accountId = v),
             ),
             if (type == TransactionType.transfer) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: FinzeeSpacing.md),
               DropdownButtonFormField<String>(
                 initialValue: toAccountId,
                 decoration: const InputDecoration(labelText: 'To account'),
@@ -118,7 +112,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               ),
             ],
             if (type == TransactionType.expense || type == TransactionType.income) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: FinzeeSpacing.md),
               DropdownButtonFormField<String>(
                 initialValue: categoryId,
                 decoration: const InputDecoration(labelText: 'Category'),
@@ -129,7 +123,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               ),
             ],
             if (type == TransactionType.saving && app.savingsGoals.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: FinzeeSpacing.md),
               DropdownButtonFormField<String>(
                 initialValue: goalId,
                 decoration: const InputDecoration(labelText: 'Savings goal'),
@@ -139,7 +133,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                 onChanged: (v) => setState(() => goalId = v),
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: FinzeeSpacing.md),
             TimelineTile(
               label: 'Date',
               date: date,
@@ -148,13 +142,9 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                 if (picked != null) setState(() => date = picked);
               },
             ),
-            const SizedBox(height: 12),
-            TextField(controller: note, decoration: const InputDecoration(labelText: 'Note')),
-            const SizedBox(height: 16),
-            if (ctrl.error != null) ...[
-              Text(ctrl.error!, style: const TextStyle(color: FinzeeColors.expense)),
-              const SizedBox(height: 8),
-            ],
+            const SizedBox(height: FinzeeSpacing.md),
+            TextField(controller: note, decoration: const InputDecoration(labelText: 'Note (optional)')),
+            const SizedBox(height: FinzeeSpacing.lg),
             FilledButton(
               onPressed: () async {
                 final ok = await runWithFeedback(
@@ -184,17 +174,9 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
 }
 
 Future<void> showEditTransaction(BuildContext context, FinanceTransaction tx) async {
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: FinzeeColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (ctx) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-      child: _EditTransactionSheet(tx: tx),
-    ),
+  await showFinzeeBottomSheet<void>(
+    context,
+    child: _EditTransactionSheet(tx: tx),
   );
 }
 
@@ -223,24 +205,28 @@ class _EditTransactionSheetState extends State<_EditTransactionSheet> {
   Widget build(BuildContext context) {
     final ctrl = FinanceScope.of(context);
     final app = ctrl.app;
+    final palette = context.finzee;
     final cats = widget.tx.type == TransactionType.income
         ? app.categories.where((c) => c.kind == CategoryKind.income)
         : app.categories.where((c) => c.kind == CategoryKind.expense);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, FinzeeSpacing.xl),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Edit ${widget.tx.type.name}', style: Theme.of(context).textTheme.titleLarge),
+            FinzeeSheetHeader(title: 'Edit ${widget.tx.type.name}'),
             if (widget.tx.allocationItemId != null)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text('Linked to a plan — only date and note can change.'),
+              Padding(
+                padding: const EdgeInsets.only(bottom: FinzeeSpacing.md),
+                child: Text(
+                  'Linked to a plan — only date and note can change.',
+                  style: TextStyle(color: palette.textSecondary, fontSize: 13),
+                ),
               ),
-            const SizedBox(height: 12),
             AmountField(controller: amount),
+            const SizedBox(height: FinzeeSpacing.md),
             TimelineTile(
               label: 'Date',
               date: date,
@@ -249,7 +235,8 @@ class _EditTransactionSheetState extends State<_EditTransactionSheet> {
                 if (picked != null) setState(() => date = picked);
               },
             ),
-            if (widget.tx.type == TransactionType.expense || widget.tx.type == TransactionType.income)
+            if (widget.tx.type == TransactionType.expense || widget.tx.type == TransactionType.income) ...[
+              const SizedBox(height: FinzeeSpacing.md),
               DropdownButtonFormField<String>(
                 initialValue: categoryId,
                 decoration: const InputDecoration(labelText: 'Category'),
@@ -258,9 +245,11 @@ class _EditTransactionSheetState extends State<_EditTransactionSheet> {
                     .toList(),
                 onChanged: (v) => setState(() => categoryId = v),
               ),
+            ],
+            const SizedBox(height: FinzeeSpacing.md),
             TextField(controller: note, decoration: const InputDecoration(labelText: 'Note')),
-            const SizedBox(height: 16),
-            if (widget.tx.allocationItemId == null) ...[
+            const SizedBox(height: FinzeeSpacing.lg),
+            if (widget.tx.allocationItemId == null)
               OutlinedButton(
                 onPressed: () async {
                   final success = await confirmAndErase(
@@ -268,14 +257,13 @@ class _EditTransactionSheetState extends State<_EditTransactionSheet> {
                     title: 'Delete transaction?',
                     erase: () => ctrl.run(() => app.deleteTransaction(widget.tx.id)),
                     failBody: () => ctrl.error,
-                    doneBody: 'This transaction has been erased from FinZee on this device.',
+                    doneBody: 'Transaction deleted from this device.',
                   );
                   if (success && context.mounted) Navigator.pop(context);
                 },
                 child: const Text('Delete transaction'),
               ),
-              const SizedBox(height: 8),
-            ],
+            if (widget.tx.allocationItemId == null) const SizedBox(height: FinzeeSpacing.sm),
             FilledButton(
               onPressed: () async {
                 final ok = await runWithFeedback(

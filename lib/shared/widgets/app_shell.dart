@@ -53,7 +53,13 @@ class AppShell extends StatelessWidget {
                 bottom: false,
                 child: ListTile(
                   dense: true,
-                  title: Text(ctrl.error!, style: const TextStyle(color: Colors.white)),
+                  title: Text(
+                    ctrl.error!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   trailing: IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: ctrl.clearError,
@@ -73,6 +79,7 @@ class AppShell extends StatelessWidget {
           : null,
       bottomNavigationBar: NavigationBar(
         height: 68,
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: navigationShell.goBranch,
         destinations: const [

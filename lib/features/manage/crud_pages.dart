@@ -45,7 +45,6 @@ class _AccountsPageState extends State<AccountsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Accounts'),
-        actions: addAppBarAction(() => _editAccount(context), 'Add account'),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Add account',
@@ -55,7 +54,6 @@ class _AccountsPageState extends State<AccountsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AddCta(label: 'Add account', onPressed: () => _editAccount(context)),
           ListControls(
             query: query,
             onQuery: (v) => setState(() => query = v),
@@ -195,7 +193,6 @@ class _CategoriesPageState extends State<CategoriesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Categories'),
-        actions: addAppBarAction(() => _edit(context), 'Add category'),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Add category',
@@ -205,7 +202,6 @@ class _CategoriesPageState extends State<CategoriesPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AddCta(label: 'Add category', onPressed: () => _edit(context)),
           ListControls(
             query: query,
             onQuery: (v) => setState(() => query = v),
@@ -319,7 +315,6 @@ class _InvestmentsPageState extends State<InvestmentsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Investments'),
-        actions: addAppBarAction(() => _edit(context), 'Add investment'),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Add investment',
@@ -329,7 +324,6 @@ class _InvestmentsPageState extends State<InvestmentsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AddCta(label: 'Add investment', onPressed: () => _edit(context)),
           ListControls(
             query: query,
             onQuery: (v) => setState(() => query = v),
@@ -465,7 +459,6 @@ class _BillsPageState extends State<BillsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bills'),
-        actions: addAppBarAction(() => _edit(context), 'Add bill'),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Add bill',
@@ -475,7 +468,6 @@ class _BillsPageState extends State<BillsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AddCta(label: 'Add bill', onPressed: () => _edit(context)),
           ListControls(
             query: query,
             onQuery: (v) => setState(() => query = v),
@@ -569,7 +561,6 @@ class _LoansPageState extends State<LoansPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Loans'),
-        actions: addAppBarAction(() => _edit(context), 'Add loan'),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Add loan',
@@ -579,7 +570,6 @@ class _LoansPageState extends State<LoansPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AddCta(label: 'Add loan', onPressed: () => _edit(context)),
           ListControls(
             query: query,
             onQuery: (v) => setState(() => query = v),
@@ -706,7 +696,6 @@ class _BudgetsPageState extends State<BudgetsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Budgets'),
-        actions: addAppBarAction(() => _edit(context), 'Add budget'),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Add budget',
@@ -716,7 +705,6 @@ class _BudgetsPageState extends State<BudgetsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AddCta(label: 'Add budget', onPressed: () => _edit(context)),
           TimelineTile(
             label: 'Budget month',
             date: DateTime(month.year, month.month, 1),
@@ -829,7 +817,6 @@ class _NotesPageState extends State<NotesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notes'),
-        actions: addAppBarAction(() => _edit(context), 'Add note'),
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Add note',
@@ -839,7 +826,6 @@ class _NotesPageState extends State<NotesPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AddCta(label: 'Add note', onPressed: () => _edit(context)),
           ListControls(
             query: query,
             onQuery: (v) => setState(() => query = v),
@@ -944,7 +930,7 @@ class DangerZonePage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: FinzeeColors.expense),
+              style: FilledButton.styleFrom(backgroundColor: context.finzee.expense),
               onPressed: () async {
                 final draft = await collectWipeDraft(
                   context,

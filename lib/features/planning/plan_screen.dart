@@ -7,6 +7,7 @@ import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
 import '../../shared/widgets/feedback.dart';
+import '../../shared/widgets/finzee_ui.dart';
 import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 
@@ -49,7 +50,7 @@ class _PlanScreenState extends State<PlanScreen> {
         Text('Monthly plan', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
         Text(app.plan?.periodKey ?? 'No plan generated yet',
-            style: const TextStyle(color: FinzeeColors.textSecondary)),
+            style: TextStyle(color: context.finzee.textSecondary)),
         const SizedBox(height: 16),
         FinzeeCard(
           child: Column(
@@ -74,48 +75,68 @@ class _PlanScreenState extends State<PlanScreen> {
                 onPressed: app.plan == null ? null : () => _editExpected(context),
                 child: const Text('Edit expected income'),
               ),
+              const SizedBox(height: FinzeeSpacing.md),
+              Wrap(
+                spacing: FinzeeSpacing.sm,
+                runSpacing: FinzeeSpacing.sm,
+                children: [
+                  FilledButton(
+                    onPressed: () => runWithFeedback(
+                      context,
+                      ctrl,
+                      app.generateThisMonth,
+                      successMessage: 'Monthly plan generated.',
+                    ),
+                    child: const Text('Generate'),
+                  ),
+                  OutlinedButton(
+                    onPressed: app.plan == null
+                        ? null
+                        : () => runWithFeedback(
+                              context,
+                              ctrl,
+                              app.confirmThisMonth,
+                              successMessage: 'Monthly plan confirmed.',
+                            ),
+                    child: const Text('Confirm'),
+                  ),
+                  PopupMenuButton<String>(
+                    enabled: app.plan != null || app.salary != null,
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'salary':
+                          runWithFeedback(
+                            context,
+                            ctrl,
+                            app.recordSalaryIncome,
+                            successMessage: 'Salary recorded as income.',
+                          );
+                        case 'allocation':
+                          _addAllocation(context);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      if (app.salary != null)
+                        const PopupMenuItem(value: 'salary', child: Text('Record salary as income')),
+                      if (app.plan != null)
+                        const PopupMenuItem(value: 'allocation', child: Text('Add allocation')),
+                    ],
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('More'),
+                          SizedBox(width: 4),
+                          Icon(Icons.expand_more, size: 18),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: () => runWithFeedback(
-            context,
-            ctrl,
-            app.generateThisMonth,
-            successMessage: 'Monthly plan generated.',
-          ),
-          child: const Text('Generate this month'),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: app.plan == null
-              ? null
-              : () => runWithFeedback(
-                    context,
-                    ctrl,
-                    app.confirmThisMonth,
-                    successMessage: 'Monthly plan confirmed.',
-                  ),
-          child: const Text('Confirm plan'),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: app.salary == null
-              ? null
-              : () => runWithFeedback(
-                    context,
-                    ctrl,
-                    app.recordSalaryIncome,
-                    successMessage: 'Salary recorded as income.',
-                  ),
-          child: const Text('Record salary as income'),
-        ),
-        const SizedBox(height: 8),
-        FilledButton.icon(
-          onPressed: app.plan == null ? null : () => _addAllocation(context),
-          icon: const Icon(Icons.add),
-          label: const Text('Add allocation'),
         ),
         const SizedBox(height: 16),
         ListControls(
@@ -419,11 +440,12 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.finzee;
     final color = switch (status) {
-      AllocationStatus.completed => FinzeeColors.income,
-      AllocationStatus.skipped => FinzeeColors.expense,
-      AllocationStatus.partial => FinzeeColors.warning,
-      AllocationStatus.pending => FinzeeColors.info,
+      AllocationStatus.completed => palette.income,
+      AllocationStatus.skipped => palette.expense,
+      AllocationStatus.partial => palette.warning,
+      AllocationStatus.pending => palette.info,
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

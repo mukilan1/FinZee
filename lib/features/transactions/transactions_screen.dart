@@ -5,6 +5,7 @@ import '../../app/theme.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
 import '../../shared/widgets/feedback.dart';
+import '../../shared/widgets/finzee_ui.dart';
 import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 import 'add_sheet.dart';
@@ -25,6 +26,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   @override
   Widget build(BuildContext context) {
     final app = FinanceScope.of(context).app;
+    final palette = context.finzee;
     final cats = {for (final c in app.categories) c.id: c.name};
     var items = app.transactions.where((t) {
       if (typeFilter != null && t.type != typeFilter) return false;
@@ -45,74 +47,66 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       };
     });
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: Row(
-            children: [
-              Expanded(child: Text('Transactions', style: Theme.of(context).textTheme.headlineMedium)),
-              IconButton(
-                onPressed: () => showAddSheet(context, TransactionType.expense),
-                tooltip: 'Add transaction',
-                icon: const Icon(Icons.add_circle),
-              ),
-            ],
-          ),
+          child: Text('Transactions', style: Theme.of(context).textTheme.headlineMedium),
         ),
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(FinzeeSpacing.md),
           child: ListControls(
             query: query,
             onQuery: (v) => setState(() => query = v),
             hint: 'Search notes, categories, types',
-            filters: TransactionType.values.map((t) => t.name).toList(),
-            selectedFilter: typeFilter?.name,
-            onFilter: (v) => setState(() {
-              typeFilter = v == null ? null : TransactionType.values.byName(v);
+            filterGroups: [
+              FilterGroup(
+                id: 'type',
+                label: 'Type',
+                options: [
+                  (null, 'All types'),
+                  ...TransactionType.values.map((t) => (t.name, t.name)),
+                ],
+              ),
+              FilterGroup(
+                id: 'account',
+                label: 'Account',
+                options: [
+                  (null, 'All accounts'),
+                  ...app.accounts.map((a) => (a.id, a.name)),
+                ],
+              ),
+            ],
+            activeFilters: {
+              'type': typeFilter?.name,
+              'account': accountFilter,
+            },
+            onFiltersChanged: (filters) => setState(() {
+              final type = filters['type'];
+              typeFilter = type == null
+                  ? null
+                  : TransactionType.values.firstWhere((t) => t.name == type);
+              accountFilter = filters['account'];
             }),
             sorts: const [('date', 'Date'), ('amount', 'Amount'), ('name', 'Note')],
             sortId: sort,
             onSort: (v) => setState(() => sort = v),
           ),
         ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              ChoiceChip(
-                label: const Text('All accounts'),
-                selected: accountFilter == null,
-                onSelected: (_) => setState(() => accountFilter = null),
-              ),
-              const SizedBox(width: 8),
-              ...app.accounts.map(
-                (a) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(a.name),
-                    selected: accountFilter == a.id,
-                    onSelected: (_) => setState(() => accountFilter = a.id),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
         Expanded(
           child: items.isEmpty
               ? const EmptyState(title: 'Nothing here', subtitle: 'Try another filter or add a transaction.')
               : ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: FinzeeSpacing.md),
                   itemCount: items.length,
                   itemBuilder: (_, i) {
                     final tx = items[i];
                     return Dismissible(
                       key: ValueKey(tx.id),
                       background: Container(
-                        color: FinzeeColors.expense,
+                        color: palette.expense,
                         alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 16),
+                        padding: const EdgeInsets.only(right: FinzeeSpacing.md),
                         child: const Icon(Icons.delete, color: Colors.white),
                       ),
                       confirmDismiss: (_) async {
@@ -145,10 +139,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         return success;
                       },
                       onDismissed: (_) {},
-                      child: InkWell(
-                        onTap: () => showEditTransaction(context, tx),
-                        child: FinzeeCard(
-                          child: TransactionRow(tx: tx, categoryName: cats[tx.categoryId]),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: FinzeeSpacing.sm),
+                        child: InkWell(
+                          onTap: () => showEditTransaction(context, tx),
+                          child: FinzeeCard(
+                            child: TransactionRow(tx: tx, categoryName: cats[tx.categoryId]),
+                          ),
                         ),
                       ),
                     );
