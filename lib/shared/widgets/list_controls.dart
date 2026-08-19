@@ -15,6 +15,27 @@ class FilterGroup {
   final String label;
   /// Map of value → label. Use `null` key for "All".
   final List<(String?, String)> options;
+
+  String? labelFor(String? value) {
+    for (final opt in options) {
+      if (opt.$1 == value) return opt.$2;
+    }
+    return value;
+  }
+}
+
+/// Merges filter sheet draft into the active filter map for every group.
+@visibleForTesting
+Map<String, String?> mergeFilterDraft(
+  Map<String, String?> current,
+  Map<String, String?> draft,
+  List<FilterGroup> groups,
+) {
+  final merged = <String, String?>{};
+  for (final g in groups) {
+    merged[g.id] = draft.containsKey(g.id) ? draft[g.id] : current[g.id];
+  }
+  return merged;
 }
 
 class ListControls extends StatefulWidget {
@@ -29,7 +50,6 @@ class ListControls extends StatefulWidget {
     this.sorts = const [],
     this.sortId,
     this.onSort,
-    // Legacy single-filter API (mapped to one group internally when used alone)
     this.filters = const [],
     this.selectedFilter,
     this.onFilter,
@@ -89,168 +109,282 @@ class _ListControlsState extends State<ListControls> {
 
   Map<String, String?> get _active {
     if (widget.filterGroups.isNotEmpty) {
-      return {
-        for (final g in widget.filterGroups) g.id: widget.activeFilters[g.id],
-      };
+      return {for (final g in widget.filterGroups) g.id: widget.activeFilters[g.id]};
     }
     if (widget.filters.isEmpty) return const {};
     return {'filter': widget.selectedFilter};
   }
 
+  String? get _defaultSort => widget.sorts.isEmpty ? null : widget.sorts.first.$1;
+
   int get _activeCount {
     var count = 0;
     for (final g in _groups) {
-      final v = _active[g.id];
-      if (v != null) count++;
+      if (_active[g.id] != null) count++;
     }
-    if (widget.sorts.isNotEmpty &&
-        widget.sortId != null &&
-        widget.sortId != widget.sorts.first.$1) {
+    if (widget.sorts.isNotEmpty && widget.sortId != null && widget.sortId != _defaultSort) {
       count++;
     }
     return count;
   }
 
   Map<String, String?> _seedDraft() {
-    final draft = <String, String?>{};
-    for (final g in _groups) {
-      draft[g.id] = _active[g.id];
+    return {for (final g in _groups) g.id: _active[g.id]};
+  }
+
+  void _publishFilters(Map<String, String?> filters, {String? sort}) {
+    if (widget.onFiltersChanged != null) {
+      widget.onFiltersChanged!(filters);
+    } else if (widget.onFilter != null) {
+      widget.onFilter!(filters['filter']);
     }
-    return draft;
+    if (sort != null && widget.onSort != null && sort != widget.sortId) {
+      widget.onSort!(sort);
+    }
+  }
+
+  void _clearFilter(String groupId) {
+    final next = _seedDraft();
+    next[groupId] = null;
+    _publishFilters(next);
+  }
+
+  void _resetAllFilters() {
+    final cleared = {for (final g in _groups) g.id: null};
+    _publishFilters(cleared, sort: _defaultSort);
   }
 
   Future<void> _openFilters(BuildContext context) async {
-    var draft = _seedDraft();
-    var draftSort = widget.sortId ?? (widget.sorts.isEmpty ? null : widget.sorts.first.$1);
-    final result = await showFinzeeBottomSheet<(Map<String, String?>, String?)>(
-      context,
-      child: StatefulBuilder(
-        builder: (ctx, setSt) {
-          final maxHeight = MediaQuery.of(ctx).size.height * 0.6;
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const FinzeeSheetHeader(title: 'Filters & sort'),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: maxHeight),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (final group in _groups) ...[
-                          FinzeeSectionLabel(group.label),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: group.options.map((opt) {
-                              final selected = draft[group.id] == opt.$1;
-                              return ChoiceChip(
-                                label: Text(opt.$2),
-                                selected: selected,
-                                onSelected: (_) => setSt(() {
-                                  draft[group.id] = opt.$1;
-                                }),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: FinzeeSpacing.lg),
-                        ],
-                        if (widget.sorts.isNotEmpty) ...[
-                          const FinzeeSectionLabel('Sort by'),
-                          ...widget.sorts.map(
-                            (s) => RadioListTile<String>(
-                              title: Text(s.$2),
-                              value: s.$1,
-                              groupValue: draftSort,
-                              contentPadding: EdgeInsets.zero,
-                              onChanged: (v) => setSt(() => draftSort = v),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: FinzeeSpacing.md),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () => setSt(() {
-                        draft = {
-                          for (final g in _groups) g.id: null,
-                        };
-                        draftSort = widget.sorts.isEmpty ? null : widget.sorts.first.$1;
-                      }),
-                      child: const Text('Reset'),
-                    ),
-                    const Spacer(),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(ctx, (draft, draftSort)),
-                      child: const Text('Apply'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
+    final palette = context.finzee;
+    final result = await showModalBottomSheet<({Map<String, String?> filters, String? sort})>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: palette.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (sheetContext) {
+        return _FilterSheet(
+          groups: _groups,
+          initialFilters: _seedDraft(),
+          initialSort: widget.sortId ?? _defaultSort,
+          sorts: widget.sorts,
+          defaultSort: _defaultSort,
+        );
+      },
     );
     if (result == null) return;
 
-    final appliedFilters = _seedDraft();
-    appliedFilters.addAll(result.$1);
-
-    if (widget.onFiltersChanged != null) {
-      widget.onFiltersChanged!(appliedFilters);
-    } else if (widget.onFilter != null) {
-      widget.onFilter!(appliedFilters['filter']);
-    }
-
-    final newSort = result.$2;
-    if (newSort != null && widget.onSort != null) {
-      widget.onSort!(newSort);
-    }
+    final applied = mergeFilterDraft(_active, result.filters, _groups);
+    _publishFilters(applied, sort: result.sort);
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.finzee;
     final hasFilters = _groups.isNotEmpty || widget.sorts.isNotEmpty;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.search),
-              hintText: widget.hint,
-              isDense: true,
-            ),
-            onChanged: widget.onQuery,
-          ),
+    final activePills = <Widget>[];
+
+    for (final group in _groups) {
+      final value = _active[group.id];
+      if (value == null) continue;
+      final label = group.labelFor(value) ?? value;
+      activePills.add(
+        InputChip(
+          label: Text('${group.label}: $label'),
+          onDeleted: () => _clearFilter(group.id),
+          deleteIconColor: palette.primaryDark,
         ),
-        if (hasFilters) ...[
-          const SizedBox(width: FinzeeSpacing.sm),
-          IconButton(
-            tooltip: 'Filters',
-            onPressed: () => _openFilters(context),
-            icon: Badge(
-              isLabelVisible: _activeCount > 0,
-              label: Text('$_activeCount'),
-              child: const Icon(Icons.tune),
+      );
+    }
+
+    if (widget.sorts.isNotEmpty &&
+        widget.sortId != null &&
+        widget.sortId != _defaultSort) {
+      String? sortLabel;
+      for (final s in widget.sorts) {
+        if (s.$1 == widget.sortId) {
+          sortLabel = s.$2;
+          break;
+        }
+      }
+      if (sortLabel != null) {
+        activePills.add(
+          InputChip(
+            label: Text('Sort: $sortLabel'),
+            onDeleted: () {
+              if (_defaultSort != null) widget.onSort?.call(_defaultSort!);
+            },
+            deleteIconColor: palette.primaryDark,
+          ),
+        );
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: widget.hint,
+                  isDense: true,
+                ),
+                onChanged: widget.onQuery,
+              ),
             ),
-            style: IconButton.styleFrom(
-              foregroundColor: palette.primaryDark,
-              backgroundColor: palette.primarySoft,
-            ),
+            if (hasFilters) ...[
+              const SizedBox(width: FinzeeSpacing.sm),
+              IconButton(
+                tooltip: 'Filters',
+                onPressed: () => _openFilters(context),
+                icon: Badge(
+                  isLabelVisible: _activeCount > 0,
+                  label: Text('$_activeCount'),
+                  child: const Icon(Icons.tune),
+                ),
+                style: IconButton.styleFrom(
+                  foregroundColor: palette.primaryDark,
+                  backgroundColor: palette.primarySoft,
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (activePills.isNotEmpty) ...[
+          const SizedBox(height: FinzeeSpacing.sm),
+          Wrap(
+            spacing: FinzeeSpacing.xs,
+            runSpacing: FinzeeSpacing.xs,
+            children: [
+              ...activePills,
+              TextButton(
+                onPressed: _resetAllFilters,
+                child: const Text('Clear all'),
+              ),
+            ],
           ),
         ],
       ],
+    );
+  }
+}
+
+class _FilterSheet extends StatefulWidget {
+  const _FilterSheet({
+    required this.groups,
+    required this.initialFilters,
+    required this.initialSort,
+    required this.sorts,
+    required this.defaultSort,
+  });
+
+  final List<FilterGroup> groups;
+  final Map<String, String?> initialFilters;
+  final String? initialSort;
+  final List<(String id, String label)> sorts;
+  final String? defaultSort;
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late Map<String, String?> _draft;
+  late String? _draftSort;
+
+  @override
+  void initState() {
+    super.initState();
+    _draft = Map<String, String?>.from(widget.initialFilters);
+    _draftSort = widget.initialSort;
+  }
+
+  void _resetDraft() {
+    setState(() {
+      _draft = {for (final g in widget.groups) g.id: null};
+      _draftSort = widget.defaultSort;
+    });
+  }
+
+  void _apply() {
+    Navigator.pop(
+      context,
+      (filters: Map<String, String?>.from(_draft), sort: _draftSort),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sheetHeight = MediaQuery.sizeOf(context).height * 0.72;
+    return SizedBox(
+      height: sheetHeight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+            child: FinzeeSheetHeader(title: 'Filters & sort'),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final group in widget.groups) ...[
+                    FinzeeSectionLabel(group.label),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: group.options.map((opt) {
+                        final selected = _draft[group.id] == opt.$1;
+                        return ChoiceChip(
+                          label: Text(opt.$2),
+                          selected: selected,
+                          onSelected: (value) {
+                            if (!value) return;
+                            setState(() => _draft[group.id] = opt.$1);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: FinzeeSpacing.lg),
+                  ],
+                  if (widget.sorts.isNotEmpty) ...[
+                    const FinzeeSectionLabel('Sort by'),
+                    ...widget.sorts.map(
+                      (s) => RadioListTile<String>(
+                        title: Text(s.$2),
+                        value: s.$1,
+                        groupValue: _draftSort,
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (v) => setState(() => _draftSort = v),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, FinzeeSpacing.sm, 20, FinzeeSpacing.lg),
+            child: Row(
+              children: [
+                TextButton(onPressed: _resetDraft, child: const Text('Reset')),
+                const Spacer(),
+                FilledButton(onPressed: _apply, child: const Text('Apply')),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
