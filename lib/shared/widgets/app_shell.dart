@@ -91,7 +91,7 @@ class AppShell extends StatelessWidget {
           NavigationDestination(
             icon: Icon(Icons.swap_horiz_outlined),
             selectedIcon: Icon(Icons.swap_horiz),
-            label: 'Transactions',
+            label: 'Ledger',
           ),
           NavigationDestination(
             icon: Icon(Icons.event_note_outlined),

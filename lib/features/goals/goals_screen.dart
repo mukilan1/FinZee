@@ -154,7 +154,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
     var targetDate = existing?.targetDate ?? DateTime.now().add(const Duration(days: 365));
     final ok = await showFinzeeDialog<bool>(
       context,
-      child: StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
         builder: (ctx, setSt) => FinzeeFormDialog(
           title: existing == null ? 'New savings goal' : 'Edit savings goal',
           fields: [
@@ -180,15 +180,15 @@ class _GoalsScreenState extends State<GoalsScreen> {
               TextButton(
                 onPressed: () => confirmEraseFromEditor(
                   pageContext: context,
-                  dialogContext: ctx,
+                  dialogContext: dialogContext,
                   title: 'Delete goal?',
                   erase: () => FinanceScope.of(context).run(() => app.deleteSavingsGoal(existing.id)),
                   failBody: () => FinanceScope.of(context).error,
                 ),
                 child: const Text('Delete'),
               ),
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Save')),
           ],
         ),
       ),
@@ -223,7 +223,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
     var deadline = existing?.deadline ?? DateTime.now().add(const Duration(days: 365));
     final ok = await showFinzeeDialog<bool>(
       context,
-      child: StatefulBuilder(
+      builder: (dialogContext) => StatefulBuilder(
         builder: (ctx, setSt) => FinzeeFormDialog(
           title: existing == null ? 'New financial goal' : 'Edit financial goal',
           fields: [
@@ -248,15 +248,15 @@ class _GoalsScreenState extends State<GoalsScreen> {
               TextButton(
                 onPressed: () => confirmEraseFromEditor(
                   pageContext: context,
-                  dialogContext: ctx,
+                  dialogContext: dialogContext,
                   title: 'Delete financial goal?',
                   erase: () => FinanceScope.of(context).run(() => app.deleteFinancialGoal(existing.id)),
                   failBody: () => FinanceScope.of(context).error,
                 ),
                 child: const Text('Delete'),
               ),
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Save')),
           ],
         ),
       ),

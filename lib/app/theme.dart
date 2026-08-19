@@ -206,10 +206,27 @@ ThemeData buildFinzeeTheme({Brightness brightness = Brightness.light}) {
       backgroundColor: palette.primarySoft,
       selectedColor: palette.primary,
       labelStyle: TextStyle(color: palette.textPrimary),
-      secondaryLabelStyle: TextStyle(color: brightness == Brightness.dark ? palette.background : Colors.white),
+      secondaryLabelStyle: TextStyle(
+        color: brightness == Brightness.dark ? palette.background : Colors.white,
+      ),
       side: BorderSide(color: palette.border),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      showCheckmark: false,
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return brightness == Brightness.dark ? palette.background : Colors.white;
+          }
+          return palette.textPrimary;
+        }),
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return palette.primary;
+          return palette.primarySoft;
+        }),
+      ),
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: palette.primaryDark,
@@ -283,11 +300,16 @@ ThemeData buildFinzeeTheme({Brightness brightness = Brightness.light}) {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: palette.surface,
       indicatorColor: palette.primarySoft,
+      height: 68,
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
-          return TextStyle(color: palette.primaryDark, fontWeight: FontWeight.w600);
+          return TextStyle(
+            color: palette.primaryDark,
+            fontWeight: FontWeight.w600,
+            fontSize: 11,
+          );
         }
-        return TextStyle(color: palette.textSecondary);
+        return TextStyle(color: palette.textSecondary, fontSize: 11);
       }),
     ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(

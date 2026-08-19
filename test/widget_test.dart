@@ -81,6 +81,30 @@ void main() {
     expect(find.textContaining('valid amount'), findsWidgets);
   });
 
+  testWidgets('cancel delete dialog keeps transactions screen visible', (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, '100');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.swap_horiz_outlined)));
+    await tester.pumpAndSettle();
+    expect(find.text('Transactions'), findsOneWidget);
+
+    final dismissible = find.byType(Dismissible);
+    expect(dismissible, findsWidgets);
+    await tester.drag(dismissible.first, const Offset(-400, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete transaction?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Transactions'), findsOneWidget);
+    expect(controller.app.transactions, isNotEmpty);
+  });
+
   testWidgets('wipe all data shows a confirmation after erase', (tester) async {
     await pumpApp(tester);
     await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.settings_outlined)));
