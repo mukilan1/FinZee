@@ -12,14 +12,15 @@ class TransactionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.finzee;
     final expenseLike = tx.type == TransactionType.expense ||
         tx.type == TransactionType.saving ||
         tx.type == TransactionType.investment;
     final color = tx.type == TransactionType.income
-        ? FinzeeColors.income
+        ? palette.income
         : expenseLike
-            ? FinzeeColors.expense
-            : FinzeeColors.info;
+            ? palette.expense
+            : palette.info;
     final prefix = tx.type == TransactionType.income
         ? '+'
         : tx.type == TransactionType.transfer
@@ -51,8 +52,8 @@ class TransactionRow extends StatelessWidget {
                 ),
                 Text(
                   '${tx.date.day}/${tx.date.month}/${tx.date.year} · ${tx.type.name}',
-                  style: const TextStyle(
-                    color: FinzeeColors.textSecondary,
+                  style: TextStyle(
+                    color: palette.textSecondary,
                     fontSize: 12,
                   ),
                 ),

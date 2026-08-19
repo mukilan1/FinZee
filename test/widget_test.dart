@@ -36,16 +36,16 @@ void main() {
 
   testWidgets('bottom navigation reaches transactions, plan, goals, settings', (tester) async {
     await pumpApp(tester);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Transactions')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.swap_horiz_outlined)));
     await tester.pumpAndSettle();
     expect(find.text('Transactions'), findsWidgets);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Plan')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.event_note_outlined)));
     await tester.pumpAndSettle();
     expect(find.text('Salary planning is off'), findsOneWidget);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Goals')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.flag_outlined)));
     await tester.pumpAndSettle();
     expect(find.text('Goals'), findsWidgets);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Settings')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.settings_outlined)));
     await tester.pumpAndSettle();
     expect(find.text('Backup & restore'), findsOneWidget);
     expect(find.text('Features'), findsOneWidget);
@@ -58,8 +58,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Accounts'));
     await tester.pumpAndSettle();
-    expect(find.text('Add account'), findsWidgets);
-    expect(find.byTooltip('Add account'), findsWidgets);
+    expect(find.byTooltip('Add account'), findsOneWidget);
   });
 
   testWidgets('adding an expense from the sheet updates home', (tester) async {
@@ -84,7 +83,7 @@ void main() {
 
   testWidgets('wipe all data shows a confirmation after erase', (tester) async {
     await pumpApp(tester);
-    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Settings')));
+    await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.settings_outlined)));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Delete all data'), 300, scrollable: find.byType(Scrollable).last);
     await tester.tap(find.text('Delete all data'));

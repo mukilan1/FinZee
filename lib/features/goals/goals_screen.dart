@@ -8,6 +8,7 @@ import '../../core/money.dart';
 import '../../domain/entities.dart';
 import '../../shared/widgets/finzee_card.dart';
 import '../../shared/widgets/feedback.dart';
+import '../../shared/widgets/finzee_ui.dart';
 import '../../shared/widgets/list_controls.dart';
 import '../../shared/widgets/transaction_row.dart';
 
@@ -34,18 +35,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
         ? b.currentAmount.minor.compareTo(a.currentAmount.minor)
         : a.name.compareTo(b.name));
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(FinzeeSpacing.lg),
       children: [
-        Row(
-          children: [
-            Expanded(child: Text('Goals', style: Theme.of(context).textTheme.headlineMedium)),
-            IconButton(
-              tooltip: 'Add savings goal',
-              onPressed: () => _editSavings(context),
-              icon: const Icon(Icons.add_circle),
-            ),
-          ],
-        ),
+        Text('Goals', style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: FinzeeSpacing.md),
         ListControls(
           query: query,
           onQuery: (v) => setState(() => query = v),
@@ -54,61 +47,97 @@ class _GoalsScreenState extends State<GoalsScreen> {
           sortId: sort,
           onSort: (v) => setState(() => sort = v),
         ),
-        AddCta(label: 'Add savings goal', onPressed: () => _editSavings(context)),
         if (app.enabled(AppFeature.savingsGoals)) ...[
-          const SizedBox(height: 8),
-          const Text('Savings goals', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          if (savings.isEmpty)
-            Text('No savings goals yet.', style: TextStyle(color: context.finzee.textSecondary)),
-          ...savings.map((g) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: FinzeeCard(
-                  child: InkWell(
-                    onTap: () => _editSavings(context, g),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(g.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text('${g.currentAmount.format()} / ${g.targetAmount.format()}'),
-                        if (g.targetDate != null)
-                          Text('Target ${g.targetDate!.day}/${g.targetDate!.month}/${g.targetDate!.year}',
-                              style: TextStyle(color: context.finzee.textSecondary, fontSize: 12)),
-                        if (g.updatedAt != null)
-                          Text('Updated ${formatRecordTimestamp(g.updatedAt)}',
-                              style: TextStyle(color: context.finzee.textSecondary, fontSize: 12)),
-                        if (g.completedAt != null)
-                          Text('Completed ${formatRecordTimestamp(g.completedAt)}',
-                              style: TextStyle(color: context.finzee.income, fontSize: 12)),
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(
-                          value: g.progress,
-                          color: context.finzee.savings,
-                          backgroundColor: context.finzee.primarySoft,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )),
-        ],
-        if (app.enabled(AppFeature.financialGoals)) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: FinzeeSpacing.md),
           Row(
             children: [
-              const Expanded(child: Text('Financial goals', style: TextStyle(fontWeight: FontWeight.w600))),
-              IconButton(onPressed: () => _editFinancial(context), icon: const Icon(Icons.add)),
+              const Expanded(
+                child: Text('Savings goals', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              TextButton.icon(
+                onPressed: () => _editSavings(context),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add'),
+              ),
             ],
           ),
-          ...financial.map((g) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(g.name),
-                subtitle: Text(
-                  '${g.currentAmount.format()} / ${g.targetAmount.format()} · ${g.onTrack ? 'On track' : 'Behind'}'
-                  '${g.completedAt != null ? ' · Done ${formatRecordTimestamp(g.completedAt)}' : ''}',
-                ),
-                onTap: () => _editFinancial(context, g),
-              )),
+          const SizedBox(height: FinzeeSpacing.sm),
+          if (savings.isEmpty)
+            Text('No savings goals yet.', style: TextStyle(color: context.finzee.textSecondary))
+          else
+            ...savings.map((g) => Padding(
+                  padding: const EdgeInsets.only(bottom: FinzeeSpacing.sm),
+                  child: FinzeeCard(
+                    child: InkWell(
+                      onTap: () => _editSavings(context, g),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(g.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text('${g.currentAmount.format()} / ${g.targetAmount.format()}'),
+                          if (g.targetDate != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Target ${g.targetDate!.day}/${g.targetDate!.month}/${g.targetDate!.year}',
+                                style: TextStyle(color: context.finzee.textSecondary, fontSize: 12),
+                              ),
+                            ),
+                          if (g.updatedAt != null)
+                            Text(
+                              'Updated ${formatRecordTimestamp(g.updatedAt)}',
+                              style: TextStyle(color: context.finzee.textSecondary, fontSize: 12),
+                            ),
+                          if (g.completedAt != null)
+                            Text(
+                              'Completed ${formatRecordTimestamp(g.completedAt)}',
+                              style: TextStyle(color: context.finzee.income, fontSize: 12),
+                            ),
+                          const SizedBox(height: FinzeeSpacing.sm),
+                          LinearProgressIndicator(
+                            value: g.progress,
+                            color: context.finzee.savings,
+                            backgroundColor: context.finzee.primarySoft,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )),
+        ],
+        if (app.enabled(AppFeature.financialGoals)) ...[
+          const SizedBox(height: FinzeeSpacing.lg),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Financial goals', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              TextButton.icon(
+                onPressed: () => _editFinancial(context),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add'),
+              ),
+            ],
+          ),
+          const SizedBox(height: FinzeeSpacing.sm),
+          if (financial.isEmpty)
+            Text('No financial goals yet.', style: TextStyle(color: context.finzee.textSecondary))
+          else
+            ...financial.map((g) => Padding(
+                  padding: const EdgeInsets.only(bottom: FinzeeSpacing.sm),
+                  child: FinzeeCard(
+                    padding: EdgeInsets.zero,
+                    child: ListTile(
+                      title: Text(g.name),
+                      subtitle: Text(
+                        '${g.currentAmount.format()} / ${g.targetAmount.format()} · ${g.onTrack ? 'On track' : 'Behind'}'
+                        '${g.completedAt != null ? ' · Done ${formatRecordTimestamp(g.completedAt)}' : ''}',
+                      ),
+                      onTap: () => _editFinancial(context, g),
+                    ),
+                  ),
+                )),
         ],
       ],
     );
@@ -119,16 +148,17 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final name = TextEditingController(text: existing?.name ?? '');
     final target = TextEditingController(text: existing == null ? '' : '${existing.targetAmount.major}');
     final current = TextEditingController(text: existing == null ? '0' : '${existing.currentAmount.major}');
-    final monthly = TextEditingController(text: existing?.monthlyContribution == null ? '' : '${existing!.monthlyContribution!.major}');
+    final monthly = TextEditingController(
+      text: existing?.monthlyContribution == null ? '' : '${existing!.monthlyContribution!.major}',
+    );
     var targetDate = existing?.targetDate ?? DateTime.now().add(const Duration(days: 365));
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSt) => AlertDialog(
-          title: Text(existing == null ? 'New savings goal' : 'Edit savings goal'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+    final ok = await showFinzeeDialog<bool>(
+      context,
+      child: StatefulBuilder(
+        builder: (ctx, setSt) => FinzeeFormDialog(
+          title: existing == null ? 'New savings goal' : 'Edit savings goal',
+          fields: [
+            FinzeeFormFields(
               children: [
                 TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
                 AmountField(controller: target, label: 'Target'),
@@ -144,7 +174,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 ),
               ],
             ),
-          ),
+          ],
           actions: [
             if (existing != null)
               TextButton(
@@ -157,6 +187,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 ),
                 child: const Text('Delete'),
               ),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
           ],
         ),
@@ -190,27 +221,28 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final target = TextEditingController(text: existing == null ? '' : '${existing.targetAmount.major}');
     final current = TextEditingController(text: existing == null ? '0' : '${existing.currentAmount.major}');
     var deadline = existing?.deadline ?? DateTime.now().add(const Duration(days: 365));
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSt) => AlertDialog(
-          title: Text(existing == null ? 'New financial goal' : 'Edit financial goal'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
-              AmountField(controller: target, label: 'Target'),
-              AmountField(controller: current, label: 'Current'),
-              TimelineTile(
-                label: 'Deadline',
-                date: deadline,
-                onPick: () async {
-                  final d = await pickTimeline(ctx, initial: deadline);
-                  if (d != null) setSt(() => deadline = d);
-                },
-              ),
-            ],
-          ),
+    final ok = await showFinzeeDialog<bool>(
+      context,
+      child: StatefulBuilder(
+        builder: (ctx, setSt) => FinzeeFormDialog(
+          title: existing == null ? 'New financial goal' : 'Edit financial goal',
+          fields: [
+            FinzeeFormFields(
+              children: [
+                TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+                AmountField(controller: target, label: 'Target'),
+                AmountField(controller: current, label: 'Current'),
+                TimelineTile(
+                  label: 'Deadline',
+                  date: deadline,
+                  onPick: () async {
+                    final d = await pickTimeline(ctx, initial: deadline);
+                    if (d != null) setSt(() => deadline = d);
+                  },
+                ),
+              ],
+            ),
+          ],
           actions: [
             if (existing != null)
               TextButton(
@@ -223,6 +255,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 ),
                 child: const Text('Delete'),
               ),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
           ],
         ),

@@ -32,7 +32,7 @@ void main() {
     expect(find.text('FinZee'), findsWidgets);
 
     await tester.tap(
-      find.descendant(of: find.byType(NavigationBar), matching: find.text('Plan')),
+      find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.event_note_outlined)),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -40,14 +40,14 @@ void main() {
     expect(find.text('Monthly plan'), findsWidgets);
 
     await tester.tap(
-      find.descendant(of: find.byType(NavigationBar), matching: find.text('Goals')),
+      find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.flag_outlined)),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Emergency Fund'), findsWidgets);
 
     await tester.tap(
-      find.descendant(of: find.byType(NavigationBar), matching: find.text('Settings')),
+      find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.settings_outlined)),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

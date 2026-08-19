@@ -88,7 +88,8 @@ class _AlertTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ctrl = FinanceScope.of(context);
-    final color = alert.severity >= 2 ? FinzeeColors.expense : FinzeeColors.warning;
+    final palette = context.finzee;
+    final color = alert.severity >= 2 ? palette.expense : palette.warning;
     AppFeature? feature;
     for (final value in AppFeature.values) {
       if (value.key == alert.featureKey) {
@@ -97,7 +98,7 @@ class _AlertTile extends StatelessWidget {
       }
     }
     return FinzeeCard(
-      color: alert.read ? FinzeeColors.surface : FinzeeColors.primarySoft,
+      color: alert.read ? palette.surface : palette.primarySoft,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -111,12 +112,12 @@ class _AlertTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   alert.body,
-                  style: const TextStyle(color: FinzeeColors.textSecondary, fontSize: 13),
+                  style: TextStyle(color: palette.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   feature?.label ?? 'Accounts',
-                  style: const TextStyle(fontSize: 11, color: FinzeeColors.textSecondary),
+                  style: TextStyle(fontSize: 11, color: palette.textSecondary),
                 ),
               ],
             ),

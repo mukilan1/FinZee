@@ -187,11 +187,46 @@ ThemeData buildFinzeeTheme({Brightness brightness = Brightness.light}) {
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    dividerTheme: DividerThemeData(color: palette.border, space: 1, thickness: 1),
+    dialogTheme: DialogThemeData(
+      backgroundColor: palette.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      titleTextStyle: text.titleLarge,
+      contentTextStyle: text.bodyMedium,
+    ),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: palette.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: palette.primarySoft,
+      selectedColor: palette.primary,
+      labelStyle: TextStyle(color: palette.textPrimary),
+      secondaryLabelStyle: TextStyle(color: brightness == Brightness.dark ? palette.background : Colors.white),
+      side: BorderSide(color: palette.border),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: palette.primaryDark,
+      contentTextStyle: TextStyle(color: brightness == Brightness.dark ? palette.background : Colors.white),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+    dividerColor: palette.border,
     colorScheme: ColorScheme.fromSeed(
       seedColor: palette.primary,
       brightness: brightness,
       primary: palette.primary,
+      onPrimary: brightness == Brightness.dark ? palette.background : Colors.white,
       surface: palette.surface,
+      onSurface: palette.textPrimary,
+      error: palette.expense,
+      onError: Colors.white,
     ),
     scaffoldBackgroundColor: palette.background,
     textTheme: text,
@@ -228,8 +263,10 @@ ThemeData buildFinzeeTheme({Brightness brightness = Brightness.light}) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: palette.surface,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      fillColor: brightness == Brightness.dark ? palette.background : palette.surface,
+      labelStyle: TextStyle(color: palette.textSecondary),
+      hintStyle: TextStyle(color: palette.textSecondary.withValues(alpha: 0.7)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: palette.border),
@@ -237,6 +274,10 @@ ThemeData buildFinzeeTheme({Brightness brightness = Brightness.light}) {
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: palette.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: palette.primary, width: 1.5),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(

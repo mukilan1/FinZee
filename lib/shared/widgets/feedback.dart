@@ -10,11 +10,15 @@ void showFinzeeSnackBar(
 }) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
+  final palette = context.finzee;
   messenger.clearSnackBars();
   messenger.showSnackBar(
     SnackBar(
-      content: Text(message),
-      backgroundColor: error ? FinzeeColors.expense : FinzeeColors.primaryDark,
+      content: Text(
+        message,
+        style: TextStyle(color: error ? Colors.white : palette.background),
+      ),
+      backgroundColor: error ? palette.expense : palette.primaryDark,
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 3),
     ),
