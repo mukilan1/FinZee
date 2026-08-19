@@ -17,7 +17,7 @@ class FilterGroup {
   final List<(String?, String)> options;
 }
 
-class ListControls extends StatelessWidget {
+class ListControls extends StatefulWidget {
   const ListControls({
     super.key,
     required this.query,
@@ -48,22 +48,53 @@ class ListControls extends StatelessWidget {
   final String? selectedFilter;
   final ValueChanged<String?>? onFilter;
 
+  @override
+  State<ListControls> createState() => _ListControlsState();
+}
+
+class _ListControlsState extends State<ListControls> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: widget.query);
+  }
+
+  @override
+  void didUpdateWidget(ListControls oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.query != oldWidget.query && widget.query != _searchController.text) {
+      _searchController.text = widget.query;
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   List<FilterGroup> get _groups {
-    if (filterGroups.isNotEmpty) return filterGroups;
-    if (filters.isEmpty) return const [];
+    if (widget.filterGroups.isNotEmpty) return widget.filterGroups;
+    if (widget.filters.isEmpty) return const [];
     return [
       FilterGroup(
         id: 'filter',
         label: 'Filter',
-        options: [(null, 'All'), ...filters.map((f) => (f, f))],
+        options: [(null, 'All'), ...widget.filters.map((f) => (f, f))],
       ),
     ];
   }
 
   Map<String, String?> get _active {
-    if (filterGroups.isNotEmpty) return activeFilters;
-    if (filters.isEmpty) return const {};
-    return {'filter': selectedFilter};
+    if (widget.filterGroups.isNotEmpty) {
+      return {
+        for (final g in widget.filterGroups) g.id: widget.activeFilters[g.id],
+      };
+    }
+    if (widget.filters.isEmpty) return const {};
+    return {'filter': widget.selectedFilter};
   }
 
   int get _activeCount {
@@ -72,18 +103,30 @@ class ListControls extends StatelessWidget {
       final v = _active[g.id];
       if (v != null) count++;
     }
-    if (sorts.isNotEmpty && sortId != null && sortId != sorts.first.$1) count++;
+    if (widget.sorts.isNotEmpty &&
+        widget.sortId != null &&
+        widget.sortId != widget.sorts.first.$1) {
+      count++;
+    }
     return count;
   }
 
+  Map<String, String?> _seedDraft() {
+    final draft = <String, String?>{};
+    for (final g in _groups) {
+      draft[g.id] = _active[g.id];
+    }
+    return draft;
+  }
+
   Future<void> _openFilters(BuildContext context) async {
-    var draft = Map<String, String?>.from(_active);
-    var draftSort = sortId ?? (sorts.isEmpty ? null : sorts.first.$1);
+    var draft = _seedDraft();
+    var draftSort = widget.sortId ?? (widget.sorts.isEmpty ? null : widget.sorts.first.$1);
     final result = await showFinzeeBottomSheet<(Map<String, String?>, String?)>(
       context,
       child: StatefulBuilder(
         builder: (ctx, setSt) {
-          final palette = ctx.finzee;
+          final maxHeight = MediaQuery.of(ctx).size.height * 0.6;
           return Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             child: Column(
@@ -91,7 +134,8 @@ class ListControls extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const FinzeeSheetHeader(title: 'Filters & sort'),
-                Flexible(
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxHeight),
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -103,7 +147,7 @@ class ListControls extends StatelessWidget {
                             runSpacing: 8,
                             children: group.options.map((opt) {
                               final selected = draft[group.id] == opt.$1;
-                              return FilterChip(
+                              return ChoiceChip(
                                 label: Text(opt.$2),
                                 selected: selected,
                                 onSelected: (_) => setSt(() {
@@ -114,9 +158,9 @@ class ListControls extends StatelessWidget {
                           ),
                           const SizedBox(height: FinzeeSpacing.lg),
                         ],
-                        if (sorts.isNotEmpty) ...[
+                        if (widget.sorts.isNotEmpty) ...[
                           const FinzeeSectionLabel('Sort by'),
-                          ...sorts.map(
+                          ...widget.sorts.map(
                             (s) => RadioListTile<String>(
                               title: Text(s.$2),
                               value: s.$1,
@@ -135,8 +179,10 @@ class ListControls extends StatelessWidget {
                   children: [
                     TextButton(
                       onPressed: () => setSt(() {
-                        draft = {};
-                        draftSort = sorts.isEmpty ? null : sorts.first.$1;
+                        draft = {
+                          for (final g in _groups) g.id: null,
+                        };
+                        draftSort = widget.sorts.isEmpty ? null : widget.sorts.first.$1;
                       }),
                       child: const Text('Reset'),
                     ),
@@ -154,29 +200,38 @@ class ListControls extends StatelessWidget {
       ),
     );
     if (result == null) return;
-    if (filterGroups.isNotEmpty || onFiltersChanged != null) {
-      onFiltersChanged?.call(result.$1);
-    } else {
-      onFilter?.call(result.$1['filter']);
+
+    final appliedFilters = _seedDraft();
+    appliedFilters.addAll(result.$1);
+
+    if (widget.onFiltersChanged != null) {
+      widget.onFiltersChanged!(appliedFilters);
+    } else if (widget.onFilter != null) {
+      widget.onFilter!(appliedFilters['filter']);
     }
-    if (result.$2 != null) onSort?.call(result.$2!);
+
+    final newSort = result.$2;
+    if (newSort != null && widget.onSort != null) {
+      widget.onSort!(newSort);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.finzee;
-    final hasFilters = _groups.isNotEmpty || sorts.isNotEmpty;
+    final hasFilters = _groups.isNotEmpty || widget.sorts.isNotEmpty;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: TextField(
+            controller: _searchController,
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
-              hintText: hint,
+              hintText: widget.hint,
               isDense: true,
             ),
-            onChanged: onQuery,
+            onChanged: widget.onQuery,
           ),
         ),
         if (hasFilters) ...[
@@ -274,14 +329,17 @@ Future<bool> confirmDelete(
   final palette = context.finzee;
   final ok = await showFinzeeDialog<bool>(
     context,
-    child: AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: Text(title),
       content: Text(body),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: palette.expense),
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () => Navigator.pop(dialogContext, true),
           child: Text(confirmLabel),
         ),
       ],
@@ -300,7 +358,7 @@ Future<void> showErasedConfirmation(
   final palette = context.finzee;
   await showFinzeeDialog<void>(
     context,
-    child: AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: Row(
         children: [
           Icon(
@@ -313,7 +371,10 @@ Future<void> showErasedConfirmation(
       ),
       content: Text(body),
       actions: [
-        FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('OK'),
+        ),
       ],
     ),
   );
@@ -383,16 +444,19 @@ Future<WipeDraft?> collectWipeDraft(
   final palette = context.finzee;
   final first = await showFinzeeDialog<bool>(
     context,
-    child: AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: const Text('Delete all FinZee data?'),
       content: const Text(
         'This permanently wipes accounts, transactions, plans, goals, and settings on this device.',
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: palette.expense),
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () => Navigator.pop(dialogContext, true),
           child: const Text('Continue'),
         ),
       ],
@@ -403,7 +467,7 @@ Future<WipeDraft?> collectWipeDraft(
   final phrase = TextEditingController();
   final second = await showFinzeeDialog<bool>(
     context,
-    child: AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: const Text('Type DELETE to confirm'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -417,10 +481,13 @@ Future<WipeDraft?> collectWipeDraft(
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: palette.expense),
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () => Navigator.pop(dialogContext, true),
           child: const Text('Wipe everything'),
         ),
       ],

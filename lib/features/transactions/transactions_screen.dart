@@ -83,9 +83,16 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             },
             onFiltersChanged: (filters) => setState(() {
               final type = filters['type'];
-              typeFilter = type == null
-                  ? null
-                  : TransactionType.values.firstWhere((t) => t.name == type);
+              if (type == null) {
+                typeFilter = null;
+              } else {
+                for (final t in TransactionType.values) {
+                  if (t.name == type) {
+                    typeFilter = t;
+                    break;
+                  }
+                }
+              }
               accountFilter = filters['account'];
             }),
             sorts: const [('date', 'Date'), ('amount', 'Amount'), ('name', 'Note')],
@@ -103,6 +110,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     final tx = items[i];
                     return Dismissible(
                       key: ValueKey(tx.id),
+                      direction: DismissDirection.endToStart,
                       background: Container(
                         color: palette.expense,
                         alignment: Alignment.centerRight,

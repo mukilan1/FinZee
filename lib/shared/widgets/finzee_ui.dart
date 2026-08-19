@@ -32,13 +32,15 @@ Future<T?> showFinzeeBottomSheet<T>(
   );
 }
 
+/// Shows a themed dialog. Always use [dialogContext] from the builder for
+/// [Navigator.pop] inside dialog actions — never the page context.
 Future<T?> showFinzeeDialog<T>(
   BuildContext context, {
-  required Widget child,
+  required Widget Function(BuildContext dialogContext) builder,
 }) {
   return showDialog<T>(
     context: context,
-    builder: (ctx) => child,
+    builder: (dialogContext) => builder(dialogContext),
   );
 }
 
