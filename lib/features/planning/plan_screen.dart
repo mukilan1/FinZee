@@ -5,10 +5,12 @@ import '../../app/theme.dart';
 import '../../core/features.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
+import '../../shared/list_query.dart';
 import '../../shared/widgets/finzee_card.dart';
 import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/finzee_ui.dart';
 import '../../shared/widgets/list_controls.dart';
+import '../../shared/widgets/list_query_host.dart';
 import '../../shared/widgets/transaction_row.dart';
 
 class PlanScreen extends StatefulWidget {
@@ -17,13 +19,18 @@ class PlanScreen extends StatefulWidget {
   State<PlanScreen> createState() => _PlanScreenState();
 }
 
-class _PlanScreenState extends State<PlanScreen> {
-  String query = '';
-  String? statusFilter;
-  String sort = 'name';
+class _PlanScreenState extends State<PlanScreen> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.plan;
+
+  @override
+  String get listQueryDefaultSort => 'name';
 
   @override
   Widget build(BuildContext context) {
+    if (!listQueryReady) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final ctrl = FinanceScope.of(context);
     final app = ctrl.app;
     if (!app.enabled(AppFeature.salaryPlanning)) {
@@ -32,14 +39,17 @@ class _PlanScreenState extends State<PlanScreen> {
         subtitle: 'Enable Salary Planning in Settings → Features. Your data stays safe.',
       );
     }
+    final statusFilter = listFilter('filter');
     final planned = app.allocations.fold(const Money(0), (p, a) => p + a.plannedAmount);
     final unallocated = (app.plan?.expectedIncome ?? const Money(0)) - planned;
     var items = app.allocations.where((a) {
       if (statusFilter != null && a.status.name != statusFilter) return false;
-      if (query.isNotEmpty && !a.name.toLowerCase().contains(query.toLowerCase())) return false;
+      if (listQuery.query.isNotEmpty && !a.name.toLowerCase().contains(listQuery.query.toLowerCase())) {
+        return false;
+      }
       return true;
     }).toList();
-    items.sort((a, b) => switch (sort) {
+    items.sort((a, b) => switch (listSortId) {
           'amount' => b.plannedAmount.minor.compareTo(a.plannedAmount.minor),
           'date' => a.sortOrder.compareTo(b.sortOrder),
           _ => a.name.compareTo(b.name),
@@ -140,15 +150,13 @@ class _PlanScreenState extends State<PlanScreen> {
         ),
         const SizedBox(height: 16),
         ListControls(
-          query: query,
-          onQuery: (v) => setState(() => query = v),
+          persistKey: listQueryKey,
+          state: listQuery,
+          onApplied: applyListQuery,
+          defaultSortId: listQueryDefaultSort,
           hint: 'Search allocations',
           filters: AllocationStatus.values.map((s) => s.name).toList(),
-          selectedFilter: statusFilter,
-          onFilter: (v) => setState(() => statusFilter = v),
           sorts: const [('name', 'Name'), ('amount', 'Amount'), ('date', 'Order')],
-          sortId: sort,
-          onSort: (v) => setState(() => sort = v),
         ),
         const SizedBox(height: 12),
         if (items.isEmpty)

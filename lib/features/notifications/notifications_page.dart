@@ -4,8 +4,10 @@ import '../../app/finance_scope.dart';
 import '../../app/theme.dart';
 import '../../core/features.dart';
 import '../../domain/entities.dart';
+import '../../shared/list_query.dart';
 import '../../shared/widgets/finzee_card.dart';
 import '../../shared/widgets/list_controls.dart';
+import '../../shared/widgets/list_query_host.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -14,10 +16,12 @@ class NotificationsPage extends StatefulWidget {
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
 
-class _NotificationsPageState extends State<NotificationsPage> {
-  String query = '';
-  String? kindFilter;
-  String sort = 'severity';
+class _NotificationsPageState extends State<NotificationsPage> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.notifications;
+
+  @override
+  String get listQueryDefaultSort => 'severity';
 
   @override
   void initState() {
@@ -31,18 +35,24 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!listQueryReady) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final ctrl = FinanceScope.of(context);
+    final kindFilter = listFilter('filter');
     var alerts = ctrl.app.allAlerts();
     final kinds = alerts.map((a) => a.kind).toSet().toList();
     alerts = alerts.where((a) {
       if (kindFilter != null && a.kind != kindFilter) return false;
-      if (query.isNotEmpty) {
+      if (listQuery.query.isNotEmpty) {
         final hay = '${a.title} ${a.body} ${a.kind}'.toLowerCase();
-        if (!hay.contains(query.toLowerCase())) return false;
+        if (!hay.contains(listQuery.query.toLowerCase())) return false;
       }
       return true;
     }).toList();
-    alerts.sort((a, b) => switch (sort) {
+    alerts.sort((a, b) => switch (listSortId) {
           'name' => a.title.compareTo(b.title),
           _ => b.severity.compareTo(a.severity),
         });
@@ -52,15 +62,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             hint: 'Search alerts',
             filters: kinds,
-            selectedFilter: kindFilter,
-            onFilter: (v) => setState(() => kindFilter = v),
             sorts: const [('severity', 'Priority'), ('name', 'Title')],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           const SizedBox(height: 12),
           if (alerts.isEmpty)
