@@ -47,4 +47,34 @@ void main() {
     expect(decoded.filters, original.filters);
     expect(decoded.sortId, original.sortId);
   });
+
+  test('list query settings survive backup restore', () async {
+    const saved = ListQueryState(
+      query: 'rent',
+      filters: {'type': 'expense'},
+      sortId: 'date',
+    );
+    await app.saveListQuery(ListQueryKeys.transactions, saved);
+
+    final json = await app.backup.exportJson();
+    await app.reload();
+
+    final beforeRestore = await app.loadListQuery(
+      ListQueryKeys.transactions,
+      defaultSort: 'date',
+    );
+    expect(beforeRestore.query, 'rent');
+
+    final safety = await app.backup.exportJson();
+    await app.backup.restore(json, safetyBackup: safety);
+    await app.reload();
+
+    final restored = await app.loadListQuery(
+      ListQueryKeys.transactions,
+      defaultSort: 'date',
+    );
+    expect(restored.query, 'rent');
+    expect(restored.filters['type'], 'expense');
+    expect(restored.sortId, 'date');
+  });
 }
