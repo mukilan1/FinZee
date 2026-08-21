@@ -125,11 +125,17 @@ class _ListControlsState extends State<ListControls> {
     return {for (final g in _groups) g.id: widget.state.filters[g.id]};
   }
 
+  bool get _searchPending => _searchController.text != widget.state.query;
+
   void _commit(ListQueryState next, {bool persist = true}) {
     widget.onApplied(next);
     if (persist && widget.persistKey != null) {
       FinanceScope.of(context).app.saveListQuery(widget.persistKey!, next);
     }
+  }
+
+  void _applyPendingSearch() {
+    _commit(widget.state.copyWith(query: _searchController.text));
   }
 
   Future<bool> _confirmReset() async {
@@ -251,10 +257,16 @@ class _ListControlsState extends State<ListControls> {
                   prefixIcon: const Icon(Icons.search),
                   hintText: widget.hint,
                   isDense: true,
+                  suffixIcon: _searchPending
+                      ? IconButton(
+                          tooltip: 'Apply search',
+                          onPressed: _applyPendingSearch,
+                          icon: const Icon(Icons.check),
+                        )
+                      : null,
                 ),
-                onChanged: (value) {
-                  widget.onApplied(widget.state.copyWith(query: value));
-                },
+                onSubmitted: (_) => _applyPendingSearch(),
+                onChanged: (_) => setState(() {}),
               ),
             ),
             if (hasFilters) ...[
@@ -275,6 +287,16 @@ class _ListControlsState extends State<ListControls> {
             ],
           ],
         ),
+        if (_searchPending) ...[
+          const SizedBox(height: FinzeeSpacing.xs),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.tonal(
+              onPressed: _applyPendingSearch,
+              child: const Text('Apply search'),
+            ),
+          ),
+        ],
         if (activePills.isNotEmpty) ...[
           const SizedBox(height: FinzeeSpacing.sm),
           Wrap(
@@ -354,7 +376,7 @@ class _FilterSheetState extends State<_FilterSheet> {
             padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: FinzeeSheetHeader(
               title: 'Filters & sort',
-              subtitle: 'Select options below, then tap Apply to save.',
+              subtitle: 'Select options below, then tap Apply. Search text is saved too.',
             ),
           ),
           Expanded(

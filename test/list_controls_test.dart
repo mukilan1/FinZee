@@ -104,4 +104,57 @@ void main() {
   expect(find.text('expense-tx'), findsOneWidget);
   expect(find.textContaining('Filter:'), findsNothing);
   });
+
+  testWidgets('search applies only after Apply and persists', (tester) async {
+    var listQuery = const ListQueryState();
+    final items = <String>['alpha', 'beta'];
+
+    List<String> filtered() {
+      final q = listQuery.query.toLowerCase();
+      return items.where((i) => q.isEmpty || i.contains(q)).toList();
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              final visible = filtered();
+              return Column(
+                children: [
+                  ListControls(
+                    state: listQuery,
+                    onApplied: (next) => setState(() => listQuery = next),
+                    defaultSortId: 'name',
+                    filters: const ['income', 'expense'],
+                  ),
+                  Expanded(
+                    child: ListView(
+                      children: visible.map((t) => Text(t)).toList(),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('alpha'), findsOneWidget);
+    expect(find.text('beta'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'alpha');
+    await tester.pumpAndSettle();
+
+    // Draft search does not filter until applied.
+    expect(find.text('beta'), findsOneWidget);
+    expect(find.text('Apply search'), findsOneWidget);
+
+    await tester.tap(find.text('Apply search'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('beta'), findsNothing);
+    expect(find.text('Apply search'), findsNothing);
+  });
 }
