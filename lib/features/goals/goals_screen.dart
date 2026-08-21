@@ -6,10 +6,12 @@ import '../../core/features.dart';
 import '../../core/ids.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
+import '../../shared/list_query.dart';
 import '../../shared/widgets/finzee_card.dart';
 import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/finzee_ui.dart';
 import '../../shared/widgets/list_controls.dart';
+import '../../shared/widgets/list_query_host.dart';
 import '../../shared/widgets/transaction_row.dart';
 
 class GoalsScreen extends StatefulWidget {
@@ -18,20 +20,27 @@ class GoalsScreen extends StatefulWidget {
   State<GoalsScreen> createState() => _GoalsScreenState();
 }
 
-class _GoalsScreenState extends State<GoalsScreen> {
-  String query = '';
-  String sort = 'name';
+class _GoalsScreenState extends State<GoalsScreen> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.goals;
+
+  @override
+  String get listQueryDefaultSort => 'name';
 
   @override
   Widget build(BuildContext context) {
+    if (!listQueryReady) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final app = FinanceScope.of(context).app;
-    bool match(String name) => query.isEmpty || name.toLowerCase().contains(query.toLowerCase());
+    bool match(String name) =>
+        listQuery.query.isEmpty || name.toLowerCase().contains(listQuery.query.toLowerCase());
     var savings = app.savingsGoals.where((g) => match(g.name)).toList();
     var financial = app.financialGoals.where((g) => match(g.name)).toList();
-    savings.sort((a, b) => sort == 'amount'
+    savings.sort((a, b) => listSortId == 'amount'
         ? b.currentAmount.minor.compareTo(a.currentAmount.minor)
         : a.name.compareTo(b.name));
-    financial.sort((a, b) => sort == 'amount'
+    financial.sort((a, b) => listSortId == 'amount'
         ? b.currentAmount.minor.compareTo(a.currentAmount.minor)
         : a.name.compareTo(b.name));
     return ListView(
@@ -40,12 +49,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
         Text('Goals', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: FinzeeSpacing.md),
         ListControls(
-          query: query,
-          onQuery: (v) => setState(() => query = v),
+          persistKey: listQueryKey,
+          state: listQuery,
+          onApplied: applyListQuery,
+          defaultSortId: listQueryDefaultSort,
           hint: 'Search goals',
           sorts: const [('name', 'Name'), ('amount', 'Progress')],
-          sortId: sort,
-          onSort: (v) => setState(() => sort = v),
         ),
         if (app.enabled(AppFeature.savingsGoals)) ...[
           const SizedBox(height: FinzeeSpacing.md),

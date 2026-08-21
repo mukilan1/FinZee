@@ -1,3 +1,4 @@
+import 'package:finzee/shared/list_query.dart';
 import 'package:finzee/shared/widgets/list_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,11 +40,12 @@ void main() {
   });
 
   testWidgets('applying a filter updates list and shows active pill', (tester) async {
-    String? typeFilter = 'expense';
+    var listQuery = const ListQueryState(filters: {'filter': 'expense'});
     final items = <String>['income-tx', 'expense-tx'];
 
     List<String> filtered() {
-      return items.where((i) => typeFilter == null || i.startsWith(typeFilter!)).toList();
+      final typeFilter = listQuery.filters['filter'];
+      return items.where((i) => typeFilter == null || i.startsWith(typeFilter)).toList();
     }
 
   await tester.pumpWidget(
@@ -55,11 +57,10 @@ void main() {
             return Column(
               children: [
                 ListControls(
-                  query: '',
-                  onQuery: (_) {},
+                  state: listQuery,
+                  onApplied: (next) => setState(() => listQuery = next),
+                  defaultSortId: 'name',
                   filters: const ['income', 'expense'],
-                  selectedFilter: typeFilter,
-                  onFilter: (v) => setState(() => typeFilter = v),
                 ),
                 Expanded(
                   child: ListView(
@@ -92,7 +93,9 @@ void main() {
 
   await tester.tap(find.byTooltip('Filters'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Reset'));
+  await tester.tap(find.text('Reset').first);
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(FilledButton, 'Reset'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Apply'));
   await tester.pumpAndSettle();

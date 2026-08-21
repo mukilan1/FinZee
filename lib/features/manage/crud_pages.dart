@@ -6,9 +6,11 @@ import '../../core/features.dart';
 import '../../core/ids.dart';
 import '../../core/money.dart';
 import '../../domain/entities.dart';
+import '../../shared/list_query.dart';
 import '../../shared/widgets/finzee_card.dart';
 import '../../shared/widgets/feedback.dart';
 import '../../shared/widgets/list_controls.dart';
+import '../../shared/widgets/list_query_host.dart';
 import '../../shared/widgets/transaction_row.dart';
 
 int _cmp(String sort, String a, String b, num na, num nb, DateTime da, DateTime db) {
@@ -26,22 +28,28 @@ class AccountsPage extends StatefulWidget {
   State<AccountsPage> createState() => _AccountsPageState();
 }
 
-class _AccountsPageState extends State<AccountsPage> {
-  String query = '';
-  String? typeFilter;
-  String sort = 'name';
+class _AccountsPageState extends State<AccountsPage> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.accounts;
+
+  @override
+  String get listQueryDefaultSort => 'name';
 
   @override
   Widget build(BuildContext context) {
+    if (!listQueryReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final app = FinanceScope.of(context).app;
+    final typeFilter = listFilter('filter');
     final balances = app.calc.accountBalances(app.accounts, app.transactions);
     var rows = balances.where((b) {
-      final q = query.toLowerCase();
+      final q = listQuery.query.toLowerCase();
       if (q.isNotEmpty && !b.account.name.toLowerCase().contains(q)) return false;
       if (typeFilter != null && b.account.type.name != typeFilter) return false;
       return true;
     }).toList();
-    rows.sort((a, b) => _cmp(sort, a.account.name, b.account.name, a.balance.minor, b.balance.minor, a.account.createdAt, b.account.createdAt));
+    rows.sort((a, b) => _cmp(listSortId, a.account.name, b.account.name, a.balance.minor, b.balance.minor, a.account.createdAt, b.account.createdAt));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Accounts'),
@@ -55,15 +63,13 @@ class _AccountsPageState extends State<AccountsPage> {
         padding: const EdgeInsets.all(16),
         children: [
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             hint: 'Search accounts',
             filters: AccountType.values.map((t) => t.name).toList(),
-            selectedFilter: typeFilter,
-            onFilter: (v) => setState(() => typeFilter = v),
             sorts: const [('name', 'Name'), ('amount', 'Balance'), ('date', 'Created')],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           const SizedBox(height: 12),
           ...rows.map(
@@ -176,20 +182,28 @@ class CategoriesPage extends StatefulWidget {
   State<CategoriesPage> createState() => _CategoriesPageState();
 }
 
-class _CategoriesPageState extends State<CategoriesPage> {
-  String query = '';
-  String? kindFilter;
-  String sort = 'name';
+class _CategoriesPageState extends State<CategoriesPage> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.categories;
+
+  @override
+  String get listQueryDefaultSort => 'name';
 
   @override
   Widget build(BuildContext context) {
+    if (!listQueryReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final app = FinanceScope.of(context).app;
+    final kindFilter = listFilter('filter');
     var rows = app.categories.where((c) {
-      if (query.isNotEmpty && !c.name.toLowerCase().contains(query.toLowerCase())) return false;
+      if (listQuery.query.isNotEmpty && !c.name.toLowerCase().contains(listQuery.query.toLowerCase())) {
+        return false;
+      }
       if (kindFilter != null && c.kind.name != kindFilter) return false;
       return true;
     }).toList();
-    rows.sort((a, b) => _cmp(sort, a.name, b.name, a.sortOrder, b.sortOrder, DateTime(2000), DateTime(2000)));
+    rows.sort((a, b) => _cmp(listSortId, a.name, b.name, a.sortOrder, b.sortOrder, DateTime(2000), DateTime(2000)));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Categories'),
@@ -203,15 +217,13 @@ class _CategoriesPageState extends State<CategoriesPage> {
         padding: const EdgeInsets.all(16),
         children: [
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             hint: 'Search categories',
             filters: CategoryKind.values.map((k) => k.name).toList(),
-            selectedFilter: kindFilter,
-            onFilter: (v) => setState(() => kindFilter = v),
             sorts: const [('name', 'Name'), ('amount', 'Order')],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           const SizedBox(height: 12),
           ...rows.map(
@@ -291,10 +303,12 @@ class InvestmentsPage extends StatefulWidget {
   State<InvestmentsPage> createState() => _InvestmentsPageState();
 }
 
-class _InvestmentsPageState extends State<InvestmentsPage> {
-  String query = '';
-  String? typeFilter;
-  String sort = 'date';
+class _InvestmentsPageState extends State<InvestmentsPage> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.investments;
+
+  @override
+  String get listQueryDefaultSort => 'date';
 
   @override
   Widget build(BuildContext context) {
@@ -305,13 +319,19 @@ class _InvestmentsPageState extends State<InvestmentsPage> {
         body: const Center(child: Text('Investments are disabled. Records are kept.')),
       );
     }
+    if (!listQueryReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final typeFilter = listFilter('filter');
     final types = app.investments.map((i) => i.type).toSet().toList();
     var rows = app.investments.where((i) {
-      if (query.isNotEmpty && !i.name.toLowerCase().contains(query.toLowerCase())) return false;
+      if (listQuery.query.isNotEmpty && !i.name.toLowerCase().contains(listQuery.query.toLowerCase())) {
+        return false;
+      }
       if (typeFilter != null && i.type != typeFilter) return false;
       return true;
     }).toList();
-    rows.sort((a, b) => _cmp(sort, a.name, b.name, a.marketValue.minor, b.marketValue.minor, a.date, b.date));
+    rows.sort((a, b) => _cmp(listSortId, a.name, b.name, a.marketValue.minor, b.marketValue.minor, a.date, b.date));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Investments'),
@@ -325,15 +345,13 @@ class _InvestmentsPageState extends State<InvestmentsPage> {
         padding: const EdgeInsets.all(16),
         children: [
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             hint: 'Search investments',
             filters: types,
-            selectedFilter: typeFilter,
-            onFilter: (v) => setState(() => typeFilter = v),
             sorts: const [('name', 'Name'), ('amount', 'Value'), ('date', 'Date')],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           const SizedBox(height: 12),
           ...rows.map(
@@ -444,9 +462,12 @@ class BillsPage extends StatefulWidget {
   State<BillsPage> createState() => _BillsPageState();
 }
 
-class _BillsPageState extends State<BillsPage> {
-  String query = '';
-  String sort = 'name';
+class _BillsPageState extends State<BillsPage> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.bills;
+
+  @override
+  String get listQueryDefaultSort => 'name';
 
   @override
   Widget build(BuildContext context) {
@@ -454,8 +475,13 @@ class _BillsPageState extends State<BillsPage> {
     if (!app.enabled(AppFeature.bills)) {
       return Scaffold(appBar: AppBar(title: const Text('Bills')), body: const Center(child: Text('Bills are disabled.')));
     }
-    var rows = app.bills.where((b) => query.isEmpty || b.name.toLowerCase().contains(query.toLowerCase())).toList();
-    rows.sort((a, b) => _cmp(sort, a.name, b.name, a.amount.minor, b.amount.minor, DateTime(2000, 1, a.dueDay), DateTime(2000, 1, b.dueDay)));
+    if (!listQueryReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    var rows = app.bills
+        .where((b) => listQuery.query.isEmpty || b.name.toLowerCase().contains(listQuery.query.toLowerCase()))
+        .toList();
+    rows.sort((a, b) => _cmp(listSortId, a.name, b.name, a.amount.minor, b.amount.minor, DateTime(2000, 1, a.dueDay), DateTime(2000, 1, b.dueDay)));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bills'),
@@ -469,11 +495,11 @@ class _BillsPageState extends State<BillsPage> {
         padding: const EdgeInsets.all(16),
         children: [
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             sorts: const [('name', 'Name'), ('amount', 'Amount'), ('date', 'Due day')],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           ...rows.map((b) => ListTile(
                 title: Text(b.name),
@@ -546,9 +572,12 @@ class LoansPage extends StatefulWidget {
   State<LoansPage> createState() => _LoansPageState();
 }
 
-class _LoansPageState extends State<LoansPage> {
-  String query = '';
-  String sort = 'name';
+class _LoansPageState extends State<LoansPage> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.loans;
+
+  @override
+  String get listQueryDefaultSort => 'name';
 
   @override
   Widget build(BuildContext context) {
@@ -556,8 +585,13 @@ class _LoansPageState extends State<LoansPage> {
     if (!app.enabled(AppFeature.loans)) {
       return Scaffold(appBar: AppBar(title: const Text('Loans')), body: const Center(child: Text('Loans are disabled.')));
     }
-    var rows = app.loans.where((l) => query.isEmpty || l.name.toLowerCase().contains(query.toLowerCase())).toList();
-    rows.sort((a, b) => _cmp(sort, a.name, b.name, a.remaining.minor, b.remaining.minor, a.startDate, b.startDate));
+    if (!listQueryReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    var rows = app.loans
+        .where((l) => listQuery.query.isEmpty || l.name.toLowerCase().contains(listQuery.query.toLowerCase()))
+        .toList();
+    rows.sort((a, b) => _cmp(listSortId, a.name, b.name, a.remaining.minor, b.remaining.minor, a.startDate, b.startDate));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Loans'),
@@ -571,11 +605,11 @@ class _LoansPageState extends State<LoansPage> {
         padding: const EdgeInsets.all(16),
         children: [
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             sorts: const [('name', 'Name'), ('amount', 'Remaining'), ('date', 'Start')],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           ...rows.map((l) => ListTile(
                 title: Text(l.name),
@@ -677,12 +711,20 @@ class BudgetsPage extends StatefulWidget {
   State<BudgetsPage> createState() => _BudgetsPageState();
 }
 
-class _BudgetsPageState extends State<BudgetsPage> {
+class _BudgetsPageState extends State<BudgetsPage> with PersistentListQuery {
   late DateTime month = DateTime.now();
-  String query = '';
+
+  @override
+  String get listQueryKey => ListQueryKeys.budgets;
+
+  @override
+  String get listQueryDefaultSort => 'name';
 
   @override
   Widget build(BuildContext context) {
+    if (!listQueryReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final app = FinanceScope.of(context).app;
     final usage = app.calc.budgetUsage(
       app.budgets,
@@ -691,7 +733,7 @@ class _BudgetsPageState extends State<BudgetsPage> {
     final rows = usage.where((u) {
       final name = app.categories.where((c) => c.id == u.budget.categoryId);
       final label = name.isEmpty ? '' : name.first.name;
-      return query.isEmpty || label.toLowerCase().contains(query.toLowerCase());
+      return listQuery.query.isEmpty || label.toLowerCase().contains(listQuery.query.toLowerCase());
     }).toList();
     return Scaffold(
       appBar: AppBar(
@@ -713,7 +755,13 @@ class _BudgetsPageState extends State<BudgetsPage> {
               if (d != null) setState(() => month = d);
             },
           ),
-          ListControls(query: query, onQuery: (v) => setState(() => query = v), hint: 'Search budgets'),
+          ListControls(
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
+            hint: 'Search budgets',
+          ),
           ...rows.map((u) {
             final name = app.categories.where((c) => c.id == u.budget.categoryId);
             final label = name.isEmpty ? 'Category' : name.first.name;
@@ -805,15 +853,23 @@ class NotesPage extends StatefulWidget {
   State<NotesPage> createState() => _NotesPageState();
 }
 
-class _NotesPageState extends State<NotesPage> {
-  String query = '';
-  String sort = 'date';
+class _NotesPageState extends State<NotesPage> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.notes;
+
+  @override
+  String get listQueryDefaultSort => 'date';
 
   @override
   Widget build(BuildContext context) {
+    if (!listQueryReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final app = FinanceScope.of(context).app;
-    var rows = app.notes.where((n) => query.isEmpty || n.body.toLowerCase().contains(query.toLowerCase())).toList();
-    rows.sort((a, b) => _cmp(sort, a.body, b.body, a.body.length, b.body.length, a.createdAt, b.createdAt));
+    var rows = app.notes
+        .where((n) => listQuery.query.isEmpty || n.body.toLowerCase().contains(listQuery.query.toLowerCase()))
+        .toList();
+    rows.sort((a, b) => _cmp(listSortId, a.body, b.body, a.body.length, b.body.length, a.createdAt, b.createdAt));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notes'),
@@ -827,11 +883,11 @@ class _NotesPageState extends State<NotesPage> {
         padding: const EdgeInsets.all(16),
         children: [
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             sorts: const [('date', 'Date'), ('name', 'Text')],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           ...rows.map((n) => ListTile(
                 title: Text(n.body),

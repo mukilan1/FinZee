@@ -5,8 +5,10 @@ import '../../app/finance_scope.dart';
 import '../../app/theme.dart';
 import '../../application/financial_calculation_service.dart';
 import '../../domain/entities.dart';
+import '../../shared/list_query.dart';
 import '../../shared/widgets/finzee_card.dart';
 import '../../shared/widgets/list_controls.dart';
+import '../../shared/widgets/list_query_host.dart';
 import '../../shared/widgets/transaction_row.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -16,16 +18,24 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> {
-  String query = '';
-  String sort = 'newest';
+class _ReportsScreenState extends State<ReportsScreen> with PersistentListQuery {
+  @override
+  String get listQueryKey => ListQueryKeys.reports;
+
+  @override
+  String get listQueryDefaultSort => 'newest';
 
   @override
   Widget build(BuildContext context) {
+    if (!listQueryReady) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final app = FinanceScope.of(context).app;
     var months = app.reportMonths();
-    if (query.isNotEmpty) {
-      final q = query.toLowerCase();
+    if (listQuery.query.isNotEmpty) {
+      final q = listQuery.query.toLowerCase();
       months = months
           .where((m) => '${m.year}-${m.month.toString().padLeft(2, '0')}'.contains(q))
           .toList();
@@ -33,7 +43,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     months.sort((a, b) {
       final da = DateTime(a.year, a.month);
       final db = DateTime(b.year, b.month);
-      return sort == 'oldest' ? da.compareTo(db) : db.compareTo(da);
+      return listSortId == 'oldest' ? da.compareTo(db) : db.compareTo(da);
     });
 
     return Scaffold(
@@ -42,12 +52,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             hint: 'Search by year-month (e.g. 2026-03)',
             sorts: const [('newest', 'Newest'), ('oldest', 'Oldest')],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           const SizedBox(height: 12),
           if (months.isEmpty)
@@ -123,14 +133,26 @@ class MonthlyReportDetailPage extends StatefulWidget {
   State<MonthlyReportDetailPage> createState() => _MonthlyReportDetailPageState();
 }
 
-class _MonthlyReportDetailPageState extends State<MonthlyReportDetailPage> {
+class _MonthlyReportDetailPageState extends State<MonthlyReportDetailPage> with PersistentListQuery {
   MonthlyReport? _report;
   List<FinanceTransaction> _transactions = [];
   List<AllocationItem> _allocations = [];
   MonthlyPlan? _plan;
-  String query = '';
-  String? typeFilter;
-  String sort = 'date';
+
+  @override
+  String get listQueryKey => ListQueryKeys.reportMonth(widget.range.year, widget.range.month);
+
+  @override
+  String get listQueryDefaultSort => 'date';
+
+  TransactionType? get _typeFilter {
+    final raw = listFilter('filter');
+    if (raw == null) return null;
+    for (final t in TransactionType.values) {
+      if (t.name == raw) return t;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -162,7 +184,7 @@ class _MonthlyReportDetailPageState extends State<MonthlyReportDetailPage> {
   Widget build(BuildContext context) {
     final palette = context.finzee;
     final report = _report;
-    if (report == null) {
+    if (report == null || !listQueryReady) {
       return Scaffold(
         appBar: AppBar(
           title: Text('${widget.range.year}-${widget.range.month.toString().padLeft(2, '0')}'),
@@ -171,15 +193,16 @@ class _MonthlyReportDetailPageState extends State<MonthlyReportDetailPage> {
       );
     }
 
+    final typeFilter = _typeFilter;
     var txs = _transactions.where((t) {
-      if (typeFilter != null && t.type.name != typeFilter) return false;
-      if (query.isEmpty) return true;
-      final q = query.toLowerCase();
+      if (typeFilter != null && t.type != typeFilter) return false;
+      if (listQuery.query.isEmpty) return true;
+      final q = listQuery.query.toLowerCase();
       return (t.note ?? '').toLowerCase().contains(q) ||
           t.type.name.contains(q) ||
           t.amount.format().toLowerCase().contains(q);
     }).toList();
-    txs.sort((a, b) => switch (sort) {
+    txs.sort((a, b) => switch (listSortId) {
           'amount' => b.amount.minor.compareTo(a.amount.minor),
           'type' => a.type.name.compareTo(b.type.name),
           _ => b.date.compareTo(a.date),
@@ -261,19 +284,17 @@ class _MonthlyReportDetailPageState extends State<MonthlyReportDetailPage> {
           Text('Transactions', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           ListControls(
-            query: query,
-            onQuery: (v) => setState(() => query = v),
+            persistKey: listQueryKey,
+            state: listQuery,
+            onApplied: applyListQuery,
+            defaultSortId: listQueryDefaultSort,
             hint: 'Search transactions',
             filters: TransactionType.values.map((t) => t.name).toList(),
-            selectedFilter: typeFilter,
-            onFilter: (v) => setState(() => typeFilter = v),
             sorts: const [
               ('date', 'Date'),
               ('amount', 'Amount'),
               ('type', 'Type'),
             ],
-            sortId: sort,
-            onSort: (v) => setState(() => sort = v),
           ),
           const SizedBox(height: 8),
           if (txs.isEmpty)

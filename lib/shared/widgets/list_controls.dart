@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../app/finance_scope.dart';
 import '../../app/theme.dart';
+import '../../shared/list_query.dart';
 import 'feedback.dart';
 import 'finzee_ui.dart';
 
@@ -41,32 +43,25 @@ Map<String, String?> mergeFilterDraft(
 class ListControls extends StatefulWidget {
   const ListControls({
     super.key,
-    required this.query,
-    required this.onQuery,
+    required this.state,
+    required this.onApplied,
+    this.persistKey,
+    this.defaultSortId,
     this.hint = 'Search',
     this.filterGroups = const [],
-    this.activeFilters = const {},
-    this.onFiltersChanged,
-    this.sorts = const [],
-    this.sortId,
-    this.onSort,
     this.filters = const [],
-    this.selectedFilter,
-    this.onFilter,
+    this.sorts = const [],
   });
 
-  final String query;
-  final ValueChanged<String> onQuery;
+  final ListQueryState state;
+  final ValueChanged<ListQueryState> onApplied;
+  /// When set, applied filters are saved to app settings (restored via backup too).
+  final String? persistKey;
+  final String? defaultSortId;
   final String hint;
   final List<FilterGroup> filterGroups;
-  final Map<String, String?> activeFilters;
-  final ValueChanged<Map<String, String?>>? onFiltersChanged;
-  final List<(String id, String label)> sorts;
-  final String? sortId;
-  final ValueChanged<String>? onSort;
   final List<String> filters;
-  final String? selectedFilter;
-  final ValueChanged<String?>? onFilter;
+  final List<(String id, String label)> sorts;
 
   @override
   State<ListControls> createState() => _ListControlsState();
@@ -78,14 +73,15 @@ class _ListControlsState extends State<ListControls> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController(text: widget.query);
+    _searchController = TextEditingController(text: widget.state.query);
   }
 
   @override
   void didUpdateWidget(ListControls oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.query != oldWidget.query && widget.query != _searchController.text) {
-      _searchController.text = widget.query;
+    if (widget.state.query != oldWidget.state.query &&
+        widget.state.query != _searchController.text) {
+      _searchController.text = widget.state.query;
     }
   }
 
@@ -107,51 +103,59 @@ class _ListControlsState extends State<ListControls> {
     ];
   }
 
-  Map<String, String?> get _active {
-    if (widget.filterGroups.isNotEmpty) {
-      return {for (final g in widget.filterGroups) g.id: widget.activeFilters[g.id]};
-    }
-    if (widget.filters.isEmpty) return const {};
-    return {'filter': widget.selectedFilter};
-  }
+  String? get _defaultSort => widget.defaultSortId ??
+      (widget.sorts.isEmpty ? null : widget.sorts.first.$1);
 
-  String? get _defaultSort => widget.sorts.isEmpty ? null : widget.sorts.first.$1;
+  String? get _effectiveSort => widget.state.sortId ?? _defaultSort;
 
   int get _activeCount {
     var count = 0;
     for (final g in _groups) {
-      if (_active[g.id] != null) count++;
+      if (widget.state.filters[g.id] != null) count++;
     }
-    if (widget.sorts.isNotEmpty && widget.sortId != null && widget.sortId != _defaultSort) {
+    if (widget.sorts.isNotEmpty &&
+        _effectiveSort != null &&
+        _effectiveSort != _defaultSort) {
       count++;
     }
     return count;
   }
 
   Map<String, String?> _seedDraft() {
-    return {for (final g in _groups) g.id: _active[g.id]};
+    return {for (final g in _groups) g.id: widget.state.filters[g.id]};
   }
 
-  void _publishFilters(Map<String, String?> filters, {String? sort}) {
-    if (widget.onFiltersChanged != null) {
-      widget.onFiltersChanged!(filters);
-    } else if (widget.onFilter != null) {
-      widget.onFilter!(filters['filter']);
-    }
-    if (sort != null && widget.onSort != null && sort != widget.sortId) {
-      widget.onSort!(sort);
+  void _commit(ListQueryState next, {bool persist = true}) {
+    widget.onApplied(next);
+    if (persist && widget.persistKey != null) {
+      FinanceScope.of(context).app.saveListQuery(widget.persistKey!, next);
     }
   }
 
-  void _clearFilter(String groupId) {
-    final next = _seedDraft();
-    next[groupId] = null;
-    _publishFilters(next);
+  Future<bool> _confirmReset() async {
+    return confirmDelete(
+      context,
+      title: 'Reset filters?',
+      body: 'Clear all filters and sorting for this list? This cannot be undone until you set new filters.',
+      confirmLabel: 'Reset',
+    );
   }
 
-  void _resetAllFilters() {
-    final cleared = {for (final g in _groups) g.id: null};
-    _publishFilters(cleared, sort: _defaultSort);
+  Future<void> _clearFilter(String groupId) async {
+    final nextFilters = Map<String, String?>.from(widget.state.filters);
+    nextFilters[groupId] = null;
+    _commit(widget.state.copyWith(filters: nextFilters, query: _searchController.text));
+  }
+
+  Future<void> _resetAllFilters() async {
+    final ok = await _confirmReset();
+    if (!ok || !mounted) return;
+    _commit(
+      ListQueryState(
+        query: _searchController.text,
+        sortId: _defaultSort,
+      ),
+    );
   }
 
   Future<void> _openFilters(BuildContext context) async {
@@ -168,16 +172,23 @@ class _ListControlsState extends State<ListControls> {
         return _FilterSheet(
           groups: _groups,
           initialFilters: _seedDraft(),
-          initialSort: widget.sortId ?? _defaultSort,
+          initialSort: _effectiveSort,
           sorts: widget.sorts,
           defaultSort: _defaultSort,
+          onConfirmReset: _confirmReset,
         );
       },
     );
     if (result == null) return;
 
-    final applied = mergeFilterDraft(_active, result.filters, _groups);
-    _publishFilters(applied, sort: result.sort);
+    final appliedFilters = mergeFilterDraft(widget.state.filters, result.filters, _groups);
+    _commit(
+      ListQueryState(
+        query: _searchController.text,
+        filters: appliedFilters,
+        sortId: result.sort ?? _defaultSort,
+      ),
+    );
   }
 
   @override
@@ -187,7 +198,7 @@ class _ListControlsState extends State<ListControls> {
     final activePills = <Widget>[];
 
     for (final group in _groups) {
-      final value = _active[group.id];
+      final value = widget.state.filters[group.id];
       if (value == null) continue;
       final label = group.labelFor(value) ?? value;
       activePills.add(
@@ -200,11 +211,11 @@ class _ListControlsState extends State<ListControls> {
     }
 
     if (widget.sorts.isNotEmpty &&
-        widget.sortId != null &&
-        widget.sortId != _defaultSort) {
+        _effectiveSort != null &&
+        _effectiveSort != _defaultSort) {
       String? sortLabel;
       for (final s in widget.sorts) {
-        if (s.$1 == widget.sortId) {
+        if (s.$1 == _effectiveSort) {
           sortLabel = s.$2;
           break;
         }
@@ -214,7 +225,12 @@ class _ListControlsState extends State<ListControls> {
           InputChip(
             label: Text('Sort: $sortLabel'),
             onDeleted: () {
-              if (_defaultSort != null) widget.onSort?.call(_defaultSort!);
+              _commit(
+                widget.state.copyWith(
+                  sortId: _defaultSort,
+                  query: _searchController.text,
+                ),
+              );
             },
             deleteIconColor: palette.primaryDark,
           ),
@@ -236,7 +252,9 @@ class _ListControlsState extends State<ListControls> {
                   hintText: widget.hint,
                   isDense: true,
                 ),
-                onChanged: widget.onQuery,
+                onChanged: (value) {
+                  widget.onApplied(widget.state.copyWith(query: value));
+                },
               ),
             ),
             if (hasFilters) ...[
@@ -266,7 +284,7 @@ class _ListControlsState extends State<ListControls> {
               ...activePills,
               TextButton(
                 onPressed: _resetAllFilters,
-                child: const Text('Clear all'),
+                child: const Text('Reset all'),
               ),
             ],
           ),
@@ -283,6 +301,7 @@ class _FilterSheet extends StatefulWidget {
     required this.initialSort,
     required this.sorts,
     required this.defaultSort,
+    required this.onConfirmReset,
   });
 
   final List<FilterGroup> groups;
@@ -290,6 +309,7 @@ class _FilterSheet extends StatefulWidget {
   final String? initialSort;
   final List<(String id, String label)> sorts;
   final String? defaultSort;
+  final Future<bool> Function() onConfirmReset;
 
   @override
   State<_FilterSheet> createState() => _FilterSheetState();
@@ -306,7 +326,9 @@ class _FilterSheetState extends State<_FilterSheet> {
     _draftSort = widget.initialSort;
   }
 
-  void _resetDraft() {
+  Future<void> _resetDraft() async {
+    final ok = await widget.onConfirmReset();
+    if (!ok || !mounted) return;
     setState(() {
       _draft = {for (final g in widget.groups) g.id: null};
       _draftSort = widget.defaultSort;
@@ -330,7 +352,10 @@ class _FilterSheetState extends State<_FilterSheet> {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
-            child: FinzeeSheetHeader(title: 'Filters & sort'),
+            child: FinzeeSheetHeader(
+              title: 'Filters & sort',
+              subtitle: 'Select options below, then tap Apply to save.',
+            ),
           ),
           Expanded(
             child: SingleChildScrollView(

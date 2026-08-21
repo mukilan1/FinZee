@@ -9,6 +9,7 @@ import '../core/money.dart';
 import '../core/validators.dart';
 import '../database/finance_repository.dart';
 import '../domain/entities.dart';
+import '../shared/list_query.dart';
 import 'alert_service.dart';
 import 'backup_service.dart';
 import 'demo_data.dart';
@@ -102,6 +103,19 @@ class FinanceApp {
     await repo.setSetting('theme_mode', preference.storageValue);
     themePreference = preference;
     await repo.audit('SETTING_CHANGED', 'theme_mode=${preference.storageValue}');
+  }
+
+  Future<ListQueryState> loadListQuery(String key, {required String defaultSort}) async {
+    final raw = await repo.setting('${ListQueryState.settingsPrefix}$key');
+    return ListQueryState.decode(raw, defaultSort: defaultSort);
+  }
+
+  Future<void> saveListQuery(String key, ListQueryState state) async {
+    await repo.setSetting('${ListQueryState.settingsPrefix}$key', state.encode());
+  }
+
+  Future<void> clearListQuery(String key, {required String defaultSort}) async {
+    await saveListQuery(key, ListQueryState(sortId: defaultSort));
   }
 
   DashboardSnapshot dashboard([DateTime? now]) {
